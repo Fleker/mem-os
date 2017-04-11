@@ -31,7 +31,7 @@ function delay(ms) {
              // Don't do anything
          }
 
-         process_add("System Idle Process", idle, 'process_table');
+         process_add("System Idle Process", idle);
          setTimeout(task_scheduler, PROCESS_TIMING_QUANTUM);
          fulfill();
     });
@@ -46,6 +46,7 @@ function delay(ms) {
         init_dream_journal.then(function() {
             setTimeout(function() {
                 $('#splashscreen').style.display = 'none';
+                $('#entry').focus();
             }, 2000);
         });
     });

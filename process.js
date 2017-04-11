@@ -13,6 +13,8 @@ process_init = null;
 process_add = null;
 // Runs a process once
 process_exec = null;
+// Removes a process from the process table
+process_remove = null;
 
 (function() {
     const PTABLE_COLUMN_PID = "pid";
@@ -20,7 +22,7 @@ process_exec = null;
     const PTABLE_COLUMN_FNC = "function";
     const PTABLE_COLUMN_STATE = "state";
     const PTABLE_COLUMN_BASE_REGISTER = "base_reg";
-    const PTABLE_COLUMN_LIMIT_REGISTER = "lim_reg";
+    const PTABLE_COLUMN_LIMIT_REGISTER = "limit_reg";
 
     var is_process_init = false;
 
@@ -50,6 +52,11 @@ process_exec = null;
         process[PTABLE_COLUMN_FNC]();
         // Put back into waiting
         process[PTABLE_COLUMN_STATE] = PROCESS_STATE_READY;
+    }
+
+    process_remove = function(pid) {
+        // By removing it from the process table we will not call it anymore
+        process_table.remove(process_table[pid]);
     }
 
     function process_generate_id() {
