@@ -7,8 +7,8 @@
     <body>
         <table>
             <tr>
-                <td onclick='show_tab(0)'>Terminal</td>
-                <td onclick='show_tab(1)'>Processes</td>
+                <td class='tab_label active' id='tab_label_0' onclick='show_tab(0)'>Terminal</td>
+                <td class='tab_label' id='tab_label_1' onclick='show_tab(1)'>Processes</td>
             </tr>
         </table>
         <div id='splashscreen'>
@@ -22,14 +22,17 @@
             </div>
             <h2 id='boot_status'>Loading...</h2>
         </div>
-        <div id='overlay'></div>
-        <div id='terminal'>
-            <div id='history'></div>
-            <form id='cli' onsubmit="cli_handler(); return false;">
-                <span>&emsp; &raquo; &nbsp;</span>
-                <input id='entry' focused autocomplete="off" />
-            </form>
+        <div class='tab' id='tab_0'>
+            <div id='overlay'></div>
+            <div id='terminal'>
+                <div id='history'></div>
+                <form id='cli' onsubmit="cli_handler(); return false;">
+                    <span>&emsp; &raquo; &nbsp;</span>
+                    <input id='entry' focused autocomplete="off" />
+                </form>
+            </div>
         </div>
+        <div class='tab' id='tab_1'></div>
         <script src="cli.js"></script>
         <script src="process.js"></script>
         <script src='main.js' defer></script>

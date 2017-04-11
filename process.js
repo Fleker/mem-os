@@ -48,6 +48,8 @@ process_remove_self = null;
         p[PTABLE_COLUMN_PID] = process_generate_id();
         p[PTABLE_COLUMN_STATE] = PROCESS_STATE_READY;
         process_table[p[PTABLE_COLUMN_PID]] = p;
+
+        update_ui();
     }
 
     process_exec = function(process) {
@@ -62,6 +64,8 @@ process_remove_self = null;
     process_remove = function(pid) {
         // By removing it from the process table we will not call it anymore
         process_table.remove(process_table[pid]);
+
+        update_ui();
     }
 
     process_remove_self = function() {
@@ -76,5 +80,16 @@ process_remove_self = null;
             console.log(pid);
         }
         return pid;
+    }
+
+    function update_ui() {
+        // Update PROCESS tab
+        var out = "<table><thead><tr><td>PID</td><td>Name</td><td>State</td><td>Base Register</td><td>Limit Register</td></tr></thead><tbody>";
+        for (i in process_table) {
+            var p = process_table[i];
+            out += "<tr><td>" + p[PTABLE_COLUMN_PID] + "</td><td>" + p[PTABLE_COLUMN_NAME] + "</td><td>" + p[PTABLE_COLUMN_STATE] + "</td><td>" + p[PTABLE_COLUMN_BASE_REGISTER] + "</td><td>" + p[PTABLE_COLUMN_LIMIT_REGISTER] + "</td></tr>";
+        }
+        out += "</tbody></table>";
+        $('#tab_1').innerHTML = out;
     }
 })();

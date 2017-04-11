@@ -21,7 +21,6 @@ function cli_history_append(cmd) {
 
 function cli_process(cmd, args) {
     if (args[0] == "hello") {
-        cli_history_append('Hello.');
         return 'Hello.';
     }
     if (cli_commands[args[0]]) {
@@ -35,4 +34,16 @@ function cli_register(cmd, fnc) {
     if (!cli_commands[cmd]) {
         cli_commands[cmd] = fnc;
     }
+}
+
+/* UI Stuff */
+function show_tab(tab_id) {
+    // Reset all styles
+    $('#tab_0').style.display = 'none';
+    $('#tab_1').style.display = 'none';
+    $('#tab_label_0').classList.remove('active');
+    $('#tab_label_1').classList.remove('active');
+
+    $('#tab_' + tab_id).style.display = 'block';
+    $('#tab_label_' + tab_id).classList.add('active');
 }
