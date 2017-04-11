@@ -1,0 +1,56 @@
+body {
+    background-color: black;
+    font-family: monospace;
+    color: #efefef;
+    margin: 0px;
+    padding: 0px;
+    overflow-y: hidden;
+}
+
+#history {
+    height: calc(100% - 32px);
+    padding-left: 8px;
+    overflow-y: scroll;
+}
+
+#entry::before {
+    content: ">"
+}
+
+#entry {
+    height: 20px;
+    background-color: black;
+    color: #efefef;
+    border: none;
+    padding-left: 8px;
+    width: calc(100% - 80px);
+    border-top: solid 1px rgba(255, 255, 255, 0.1);
+    padding-top: 2px;
+    padding-bottom: 2px;
+    font-family: monospace;
+}
+
+#entry:focus {
+    border: solid 1px #999;
+}
+
+/* Fancy Scrollbar */
+#history::-webkit-scrollbar {
+    width: 1em;
+}
+
+#history::-webkit-scrollbar-track {
+    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
+}
+
+#history::-webkit-scrollbar-thumb {
+  background-color: darkgrey;
+  outline: 1px solid slategrey;
+}
+
+#splashscreen {
+    position: fixed;
+    background-color: #772953;
+    height: 100vh;
+    width: 100vw;
+}
