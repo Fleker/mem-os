@@ -2,18 +2,19 @@
     <head>
         <title>MemOS - Memristive Memory Emulator</title>
         <link href="style.css" rel="stylesheet" />
+        <link href="loading.css" rel="stylesheet" />
     </head>
     <body>
         <div id='splashscreen'>
             <!-- Boot Screen -->
             <h1>MemOS</h1>
-            <h2 id='status'>Processing...</h2>
             <div class="cssload-thecube">
                 <div class="cssload-cube cssload-c1"></div>
                 <div class="cssload-cube cssload-c2"></div>
                 <div class="cssload-cube cssload-c4"></div>
                 <div class="cssload-cube cssload-c3"></div>
             </div>
+            <h2 id='boot_status'>Loading...</h2>
         </div>
         <div id='overlay'></div>
         <div id='terminal'>
@@ -24,6 +25,7 @@
             </form>
         </div>
         <script src="cli.js"></script>
-        <script src='main.js'></script>
+        <script src="process.js"></script>
+        <script src='main.js' defer></script>
     </body>
 </html>

@@ -53,4 +53,7 @@ body {
     background-color: #772953;
     height: 100vh;
     width: 100vw;
+    font-family: sans-serif;
+    text-align: center;
+    padding-top: 10%;
 }
