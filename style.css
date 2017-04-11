@@ -8,7 +8,7 @@ body {
 }
 
 #history {
-    height: calc(100% - 32px);
+    height: calc(100% - 48px);
     padding-left: 8px;
     overflow-y: scroll;
 }

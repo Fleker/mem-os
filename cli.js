@@ -24,17 +24,15 @@ function cli_process(cmd, args) {
         cli_history_append('Hello.');
         return 'Hello.';
     }
-    if (args[0] == "shutdown") {
-        if (args[1] == "-r") {
-            window.location.reload();
-            return "Rebooting...";
-        } else if (args[1] == "-s") {
-            // Can't close window itself, redirect to help
-            window.location.href = "README.md";
-            return;
-        } else {
-            return "-r : Reboot<br>-s : Shutdown";
-        }
+    if (cli_commands[args[0]]) {
+        return cli_commands[args[0]](args);
     }
     return 'Command not recognized';
+}
+
+var cli_commands = {};
+function cli_register(cmd, fnc) {
+    if (!cli_commands[cmd]) {
+        cli_commands[cmd] = fnc;
+    }
 }

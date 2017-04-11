@@ -15,6 +15,9 @@ process_add = null;
 process_exec = null;
 // Removes a process from the process table
 process_remove = null;
+// Removes the current process from the process table.
+// You can use this to run a process once and remove it at the end.
+process_remove_self = null;
 
 (function() {
     const PTABLE_COLUMN_PID = "pid";
@@ -27,6 +30,7 @@ process_remove = null;
     var is_process_init = false;
 
     var process_table = undefined;
+    var current_process = undefined;
 
     process_init = function(table) {
         if (!is_process_init) {
@@ -49,6 +53,7 @@ process_remove = null;
     process_exec = function(process) {
         // Set state to active
         process[PTABLE_COLUMN_STATE] = PROCESS_STATE_ACTIVE;
+        current_process = process[PTABLE_COLUMN_PID];
         process[PTABLE_COLUMN_FNC]();
         // Put back into waiting
         process[PTABLE_COLUMN_STATE] = PROCESS_STATE_READY;
@@ -57,6 +62,11 @@ process_remove = null;
     process_remove = function(pid) {
         // By removing it from the process table we will not call it anymore
         process_table.remove(process_table[pid]);
+    }
+
+    process_remove_self = function() {
+        // Remove current process.
+        process_remove(current_process);
     }
 
     function process_generate_id() {

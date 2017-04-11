@@ -40,7 +40,23 @@ function delay(ms) {
         fulfill();
     })
 
+    var cmd_shutdown = function(args) {
+        if (args[1] == "-r") {
+            window.location.reload();
+            return "Rebooting...";
+        } else if (args[1] == "-s") {
+            // Can't close window itself, redirect to help
+            window.location.href = "README.md";
+            return;
+        } else {
+            return "-r : Reboot<br>-s : Shutdown";
+        }
+    }
+
     boot_state("Loading...");
+
+    cli_register("shutdown", cmd_shutdown);
+
     init_process.then(function() {
         boot_state("Restarting tasks...");
         init_dream_journal.then(function() {
