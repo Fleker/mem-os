@@ -13,19 +13,22 @@ process_init = null;
 process_add = null;
 // Runs a process once
 process_exec = null;
-// Removes a process from the process table
+// Removes a process from the process table.
 process_remove = null;
+// Obtains the current process from the process table. As this will only be read by the currently running function, it shouldn't pose any security issues.
+process_get_current = null;
 // Removes the current process from the process table.
 // You can use this to run a process once and remove it at the end.
 process_remove_self = null;
 
+const PTABLE_COLUMN_PID = "pid";
+const PTABLE_COLUMN_NAME = "name";
+const PTABLE_COLUMN_FNC = "function";
+const PTABLE_COLUMN_STATE = "state";
+const PTABLE_COLUMN_BASE_REGISTER = "base_reg";
+const PTABLE_COLUMN_LIMIT_REGISTER = "limit_reg";
+
 (function() {
-    const PTABLE_COLUMN_PID = "pid";
-    const PTABLE_COLUMN_NAME = "name";
-    const PTABLE_COLUMN_FNC = "function";
-    const PTABLE_COLUMN_STATE = "state";
-    const PTABLE_COLUMN_BASE_REGISTER = "base_reg";
-    const PTABLE_COLUMN_LIMIT_REGISTER = "limit_reg";
 
     var is_process_init = false;
 
@@ -55,6 +58,8 @@ process_remove_self = null;
     process_exec = function(process) {
         // Set state to active
         process[PTABLE_COLUMN_STATE] = PROCESS_STATE_ACTIVE;
+        // System Invariant - Only the current process is running.
+        // This wouldn't really work in multi-core systems. Each core would need to be assigned a current process.
         current_process = process[PTABLE_COLUMN_PID];
         process[PTABLE_COLUMN_FNC]();
         // Put back into waiting
@@ -62,6 +67,8 @@ process_remove_self = null;
     }
 
     process_remove = function(pid) {
+        // Memory cleanup
+        mem_free(process_table[pid][PTABLE_COLUMN_BASE_REGISTER], process_table[pid][PTABLE_COLUMN_LIMIT_REGISTER]);
         // By removing it from the process table we will not call it anymore
         process_table.remove(process_table[pid]);
 
@@ -71,6 +78,10 @@ process_remove_self = null;
     process_remove_self = function() {
         // Remove current process.
         process_remove(current_process);
+    }
+
+    process_get_current = function() {
+        return current_process;
     }
 
     function process_generate_id() {
