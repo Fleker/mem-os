@@ -10,6 +10,11 @@ function delay(ms) {
     while (new Date().getTime() - time < ms) {}
 }
 
+// Label for the OS version
+const VERSION_NAME = "0.0.1";
+// Numerical build number for OS version
+const VERSION_CODE = 1;
+
 (function() {
     var process_table = [];
     const init_process = new Promise(function(fulfill, reject) {
@@ -103,6 +108,10 @@ function delay(ms) {
         return "";
     }
 
+    const cmd_about = function(args) {
+        return "~MemOS~<br>An OS emulator for resistive-based memory<br>Find out more in our project write-up.<br>version " + VERSION_NAME + "  (" + VERSION_CODE + ")";
+    }
+
     const kernel_mem_exist = function(addr) {
         // TODO Verify address
         return mem_get(addr) != undefined;
@@ -126,6 +135,7 @@ function delay(ms) {
     cli_register("memtest", cmd_mem_test);
     cli_register("kill", cmd_kill);
     cli_register("clear", cmd_clear);
+    cli_register("about", cmd_about);
 
     boot_state("Remembering...");
 
