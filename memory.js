@@ -9,6 +9,8 @@ var mem_set = null;
 // Frees a certain amount of memory from a process.
 var mem_free = null;
 
+// The process has more memory already allocated than it requested.
+var MEM_ERROR_PROCESS_MEMORY_OVERLOAD = -3;
 // The system cannot allocate enough memory.
 var MEM_ERROR_ALLOCATION = -2;
 // The process requested memory it cannot access.
@@ -46,6 +48,8 @@ var MEM_FREE_OK = 0;
             kernel_mem_set = kms;
             process_table = kprocess_table;
             is_mem_init = true;
+
+            update_ui();
         }
     }
 
@@ -64,6 +68,7 @@ var MEM_FREE_OK = 0;
             }
             // Exit once we've got memory in each location
             is_bitmap_init = true;
+            update_ui();
         }
     }
 
@@ -73,7 +78,9 @@ var MEM_FREE_OK = 0;
         // Try to over-allocate memory.
         //
         // We need to check the bitmap.
-        // TODO Check whether process already has too much memory.
+        if (bytes < process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]) {
+            return MEM_ERROR_PROCESS_MEMORY_OVERLOAD;
+        }
         var requested_bytes = Math.pow(2, Math.ceil(Math.log2(bytes)));
         var mem_alloc_index = Math.floor(Math.log2(requested_bytes)) - bitmap_min;
         for (var i = mem_alloc_index; i < bitmap.length; i++) {
@@ -90,6 +97,8 @@ var MEM_FREE_OK = 0;
                         bitmap[i].prev = null;
                     }
                     // TODO Check if memory has already been allocated to process. MemCpy.
+
+                    update_ui();
                     return addr;
                 } else {
                     // Splice node's bytes in half.
@@ -110,6 +119,7 @@ var MEM_FREE_OK = 0;
                 }
             }
         }
+        // TODO Handle a memory allocation script
         throw MEM_ERROR_ALLOCATION;
     }
 
@@ -124,6 +134,8 @@ var MEM_FREE_OK = 0;
             bitmap[mem_alloc_index].prev = node;
         }
         bitmap[mem_alloc_index] = node;
+
+        update_ui();
         return MEM_FREE_OK;
     }
 
@@ -143,6 +155,28 @@ var MEM_FREE_OK = 0;
         // Translate to kernel address
         var kaddr = process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER] + addr;
         kernel_mem_set(kaddr, val);
+
+        update_ui();
         return MEM_WRITE_OK;
+    }
+
+    function update_ui() {
+        // Updates the memory display
+        // For entire capacity
+        var out = "<table><thead><tr><td>Bytes</td><td>Starting Address</td></thead><tbody>";
+        for (var i = 0; i < bitmap.length; i++) {
+            var v = (bitmap[i]) ? bitmap[i].value : "Undefined";
+            out += "<tr><td>" + Math.pow(2, i + bitmap_min) + "</td><td>" + v + "</td></tr>";
+        }
+        out += "</tbody></table>";
+        $('#tab_2').innerHTML = out;
+
+        out = "<table><thead><tr><td>Address</td><td>Value</td></thead><tbody>";
+        for (var i = 0; i < 1024; i++) {
+            out += "<tr><td>0x" + i.toString(16) + "</td><td class='mem_cell'>" + kernel_mem_get(i) + "</td></tr>";
+        }
+        out += "</tbody></table>";
+
+        $('#tab_3').innerHTML = out;
     }
 })();
