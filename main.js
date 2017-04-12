@@ -79,6 +79,30 @@ function delay(ms) {
         return out;
     }
 
+    // Allows a process to be force stopped
+    const cmd_kill = function(args) {
+        if (args.length > 1) {
+            try {
+                var pid = parseInt(args[1]);
+                if (pid == 0) {
+                    return "Cannot end system process";
+                }
+                process_remove(pid);
+                return "Process killed";
+            } catch (e) {
+                return e.message;
+            }
+        } else {
+            return "Usage : kill [pid]<br>pid - Process id. Can be obtained by running `processes`.";
+        }
+    }
+
+    // Clears the history
+    const cmd_clear = function(args) {
+        $('#history').innerHTML = "";
+        return "";
+    }
+
     const kernel_mem_exist = function(addr) {
         // TODO Verify address
         return mem_get(addr) != undefined;
@@ -100,6 +124,8 @@ function delay(ms) {
     cli_register("processes", cmd_process);
     cli_register("help", cmd_help);
     cli_register("memtest", cmd_mem_test);
+    cli_register("kill", cmd_kill);
+    cli_register("clear", cmd_clear);
 
     boot_state("Remembering...");
 

@@ -72,6 +72,10 @@ const PTABLE_COLUMN_PROCESS_ARGS = "args";
     }
 
     process_remove = function(pid) {
+        if (pid == 0) {
+            // Cannot end system task
+            return;
+        }
         // Memory cleanup
         mem_free(process_table[pid][PTABLE_COLUMN_BASE_REGISTER], process_table[pid][PTABLE_COLUMN_LIMIT_REGISTER]);
         // By removing it from the process table we will not call it anymore
@@ -91,6 +95,10 @@ const PTABLE_COLUMN_PROCESS_ARGS = "args";
 
     function process_generate_id() {
         var pid = -1;
+        if (process_table.length == 0) {
+            // Put in system idle task id
+            return 0;
+        }
         while (pid == -1 || process_table[pid] != undefined) {
             pid = Math.round((Math.random() * PROCESS_MAX));
             console.log(pid);
