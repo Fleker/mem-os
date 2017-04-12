@@ -20,6 +20,7 @@ function delay(ms) {
             // Iterate through every process and execute it.
             // Simple round robin implementation. No priority.
             for (i in process_table) {
+                // TODO Handle Process Waiting State
                 var p = process_table[i];
                 process_exec(p);
             }
@@ -66,17 +67,31 @@ function delay(ms) {
         return out;
     }
 
-    const mem_exist = function(addr) {
+    // Runs a memory test process
+    const cmd_mem_test = function(args) {
+        // TODO allow random commands to access memory or file systems with a temporary PID
+        var addr = mem_request(12);
+        var out = "Received address " + addr + "<br>";
+        out += mem_read(0) + " --<br>";
+        mem_set(0, 20);
+        mem_set(1, 41);
+        out += mem_read(0) + " --<br>";
+        out += mem_read(1) + " --<br>";
+//        process_remove_self();
+        return out;
+    }
+
+    const kernel_mem_exist = function(addr) {
         // TODO Verify address
         return mem_get(addr) != undefined;
     }
 
-    const mem_get = function(addr) {
+    const kernel_mem_get = function(addr) {
         // TODO Verify address
         return localStorage['memos_memory_' + addr];
     }
 
-    const mem_set = function(addr, val) {
+    const kernel_mem_set = function(addr, val) {
         // TODO Verify address
         localStorage['memos_memory_' + addr] = val;
     }
@@ -86,10 +101,11 @@ function delay(ms) {
     cli_register("shutdown", cmd_shutdown);
     cli_register("processes", cmd_process);
     cli_register("help", cmd_help);
+    cli_register("memtest", cmd_mem_test);
 
     boot_state("Remembering...");
 
-    mem_init(mem_exist, mem_get, mem_set, process_table);
+    mem_init(kernel_mem_exist, kernel_mem_get, kernel_mem_set, process_table);
     // TODO Load config parameters.
     // TODO Pass in the offset which is from the file system.
     // Right now no bytes are used for the file system.
@@ -108,6 +124,9 @@ function delay(ms) {
 
 /* Node Class */
 function Node(val) {
+    if (val instanceof Node) {
+        val = val.value;
+    }
     this.value = val;
     this.prev  = null;
     this.next  = null;

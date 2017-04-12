@@ -86,19 +86,25 @@ var MEM_FREE_OK = 0;
                     process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER] = requested_bytes;
                     // Remove from bitmap
                     bitmap[i] = bitmap[i].next;
-                    bitmap[i].prev = null;
+                    if (bitmap[i]) {
+                        bitmap[i].prev = null;
+                    }
                     // TODO Check if memory has already been allocated to process. MemCpy.
                     return addr;
                 } else {
                     // Splice node's bytes in half.
-                    var newLength = Math.pow(2, i - 1);
+                    var newLength = Math.pow(2, i - 1 + bitmap_min);
                     var addr1 = new Node(bitmap[i]);
-                    var addr2 = new Node(bitmap[i] + newLength);
+                    var addr2 = new Node(bitmap[i].value + newLength);
                     addr2.next = bitmap[i - 1];
                     addr2.prev = addr1;
-                    addr1.next = addr;
+                    addr1.next = addr2;
                     bitmap[i] = bitmap[i].next;
+                    if (bitmap[i]) {
+                        bitmap[i].prev = null;
+                    }
                     bitmap[i - 1] = addr1;
+                    bitmap[i - 1].prev = null;
                     // Go through the process again until we find memory.
                     return mem_request(bytes);
                 }
