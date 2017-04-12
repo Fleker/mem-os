@@ -76,8 +76,9 @@ var MEM_FREE_OK = 0;
         // We are using a version of Quick Fit to quickly allocate memory.
         // This is an array of linked nodes.
         // Try to over-allocate memory.
-        //
         // We need to check the bitmap.
+
+        // Make sure we aren't requesting too little memory.
         if (bytes < process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]) {
             return MEM_ERROR_PROCESS_MEMORY_OVERLOAD;
         }
@@ -89,6 +90,11 @@ var MEM_FREE_OK = 0;
                 if (i == mem_alloc_index) {
                     // Allocate all bytes in node
                     var addr = bitmap[i].value;
+                    // Check if memory has already been allocated to process. If so, copy bytes.
+                    if (process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER]) {
+                        mem_cpy(process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], addr, process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]);
+                    }
+
                     process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER] = addr;
                     process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER] = requested_bytes;
                     // Remove from bitmap
@@ -96,8 +102,6 @@ var MEM_FREE_OK = 0;
                     if (bitmap[i]) {
                         bitmap[i].prev = null;
                     }
-                    // TODO Check if memory has already been allocated to process. MemCpy.
-
                     update_ui();
                     return addr;
                 } else {

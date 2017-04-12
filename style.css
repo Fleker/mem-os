@@ -62,6 +62,8 @@ body {
 .tab_label {
     text-transform: uppercase;
     border-right: solid 1px #555;
+    padding-right: 4px;
+    padding-left: 4px;
 }
 
 .tab_label.active {
