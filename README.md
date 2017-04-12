@@ -22,3 +22,25 @@ _An operating system emulator using solely resistive-based memory_
 
 ### System Invariants
 * The current process is the only one running. System calls are based on obtaining the current process and performing a table lookup.
+* Terminal commands are run in a sandbox, with their own memory pool.
+* Some memory calls throw errors in certain bounding cases.
+
+### Memory
+* `mem_request(bytes)`
+* `mem_free(addr, bytes)`
+* `mem_read(addr)`
+* `mem_set(addr, bytes)`
+
+### Processes
+* `process_add(name, process_function, [args])`
+* `process_remove(pid)`
+* `process_remove_self()`
+* `process_get_current()`
+
+### Terminal
+* `cli_register(keyword, function)`
+* `cli_history_append(text)`
+* `cli_process(terminal_cmd)`
+
+### Known Issues
+* Memory / storage isn't actually that secure due to `localStorage` limitations.

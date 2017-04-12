@@ -103,7 +103,7 @@ var MEM_FREE_OK = 0;
                         bitmap[i].prev = null;
                     }
                     update_ui();
-                    return addr;
+                    return requested_bytes;
                 } else {
                     // Splice node's bytes in half.
                     var newLength = Math.pow(2, i - 1 + bitmap_min);

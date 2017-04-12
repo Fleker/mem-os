@@ -23,6 +23,7 @@ process_remove_self = null;
 
 const PTABLE_COLUMN_PID = "pid";
 const PTABLE_COLUMN_NAME = "name";
+const PTABLE_COLUMN_PARENT = "parent";
 const PTABLE_COLUMN_FNC = "function";
 const PTABLE_COLUMN_STATE = "state";
 const PTABLE_COLUMN_BASE_REGISTER = "base_reg";
