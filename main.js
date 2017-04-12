@@ -69,7 +69,6 @@ function delay(ms) {
 
     // Runs a memory test process
     const cmd_mem_test = function(args) {
-        // TODO allow random commands to access memory or file systems with a temporary PID
         var addr = mem_request(12);
         var out = "Received address " + addr + "<br>";
         out += mem_read(0) + " --<br>";
@@ -77,7 +76,6 @@ function delay(ms) {
         mem_set(1, 41);
         out += mem_read(0) + " --<br>";
         out += mem_read(1) + " --<br>";
-//        process_remove_self();
         return out;
     }
 

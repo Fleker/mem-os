@@ -115,12 +115,14 @@ var MEM_FREE_OK = 0;
 
     mem_free = function(addr, len) {
         // Be conservative with how many bytes are being freed.
-        var requested_bytes = Math.pow(2, Math.floor(Math.log2(bytes)));
+        var requested_bytes = Math.pow(2, Math.floor(Math.log2(len)));
         var mem_alloc_index = Math.floor(Math.log2(requested_bytes)) - bitmap_min;
         // Create a new node to put back into bitmap
         var node = new Node(addr);
         node.next = bitmap[mem_alloc_index];
-        bitmap[mem_alloc_index].prev = node;
+        if (bitmap[mem_alloc_index]) {
+            bitmap[mem_alloc_index].prev = node;
+        }
         bitmap[mem_alloc_index] = node;
         return MEM_FREE_OK;
     }

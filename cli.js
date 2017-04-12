@@ -10,7 +10,7 @@ function cli_handler() {
     var cmd = $('#entry').value.toLowerCase();
     var args = cmd.split(' ');
     cli_history_append(cmd);
-    cli_history_append(cli_process(cmd, args));
+    process_add("Terminal", cli_process, args);
     $('#entry').value = ''; // Clear input
 }
 
@@ -19,7 +19,12 @@ function cli_history_append(cmd) {
     $('#history').scrollTop = $('#history').scrollHeight; // Force to bottom
 }
 
-function cli_process(cmd, args) {
+function cli_process(args) {
+    cli_history_append(cli_parse(args.join(' '), args));
+    process_remove_self();
+}
+
+function cli_parse(cmd, args) {
     if (args[0] == "hello") {
         return 'Hello.';
     }

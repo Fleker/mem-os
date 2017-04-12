@@ -27,6 +27,7 @@ const PTABLE_COLUMN_FNC = "function";
 const PTABLE_COLUMN_STATE = "state";
 const PTABLE_COLUMN_BASE_REGISTER = "base_reg";
 const PTABLE_COLUMN_LIMIT_REGISTER = "limit_reg";
+const PTABLE_COLUMN_PROCESS_ARGS = "args";
 
 (function() {
 
@@ -42,7 +43,7 @@ const PTABLE_COLUMN_LIMIT_REGISTER = "limit_reg";
         }
     }
 
-    process_add = function(name, process) {
+    process_add = function(name, process, params) {
         // Generate process
         var p = {};
         p[PTABLE_COLUMN_NAME] = name;
@@ -50,6 +51,9 @@ const PTABLE_COLUMN_LIMIT_REGISTER = "limit_reg";
         // Default
         p[PTABLE_COLUMN_PID] = process_generate_id();
         p[PTABLE_COLUMN_STATE] = PROCESS_STATE_READY;
+        if (params) {
+            p[PTABLE_COLUMN_PROCESS_ARGS] = params;
+        }
         process_table[p[PTABLE_COLUMN_PID]] = p;
 
         update_ui();
@@ -61,7 +65,8 @@ const PTABLE_COLUMN_LIMIT_REGISTER = "limit_reg";
         // System Invariant - Only the current process is running.
         // This wouldn't really work in multi-core systems. Each core would need to be assigned a current process.
         current_process = process[PTABLE_COLUMN_PID];
-        process[PTABLE_COLUMN_FNC]();
+        // Run with args
+        process[PTABLE_COLUMN_FNC](process[PTABLE_COLUMN_PROCESS_ARGS]);
         // Put back into waiting
         process[PTABLE_COLUMN_STATE] = PROCESS_STATE_READY;
     }
@@ -70,7 +75,7 @@ const PTABLE_COLUMN_LIMIT_REGISTER = "limit_reg";
         // Memory cleanup
         mem_free(process_table[pid][PTABLE_COLUMN_BASE_REGISTER], process_table[pid][PTABLE_COLUMN_LIMIT_REGISTER]);
         // By removing it from the process table we will not call it anymore
-        process_table.remove(process_table[pid]);
+        delete process_table[pid];
 
         update_ui();
     }
