@@ -10,7 +10,9 @@ const PROCESS_MAX = 1000; // For over this number of processes, the system canno
 // Inits the process system
 process_init = null;
 // Allows a process to be created and added to the task scheduler.
-process_add = null;
+process_create = null;
+// Allows a process to create a child process which can access this process's memory
+process_create_child = null;
 // Runs a process once
 process_exec = null;
 // Removes a process from the process table.
@@ -21,13 +23,29 @@ process_get_current = null;
 // You can use this to run a process once and remove it at the end.
 process_remove_self = null;
 
+// Process ID
 const PTABLE_COLUMN_PID = "pid";
+// Process label
 const PTABLE_COLUMN_NAME = "name";
+// If it has a parent, the PID of that parent process
 const PTABLE_COLUMN_PARENT = "parent";
+// A JS function (pointer to executable code)
 const PTABLE_COLUMN_FNC = "function";
+// The current process state
 const PTABLE_COLUMN_STATE = "state";
+// Memory address where the process can begin using
 const PTABLE_COLUMN_BASE_REGISTER = "base_reg";
+// Length of memory that the process can use
 const PTABLE_COLUMN_LIMIT_REGISTER = "limit_reg";
+// Memory address where the process can store non-volatile data in "app space"
+const PTABLE_COLUMN_BASE_NVREGISTER = "base_nvreg";
+// Length of memory in the process's "app space"
+const PTABLE_COLUMN_LIMIT_NVREGISTER = "limit_nvreg";
+// File system location which is used to read/write "app space" data
+const PTABLE_COLUMN_APPLICATION_PATH = "path";
+// The time in which the process was created
+const PTABLE_COLUMN_TIME_EXEC = "time";
+// Any arguments supplied to the process when it is created
 const PTABLE_COLUMN_PROCESS_ARGS = "args";
 
 (function() {
@@ -44,18 +62,38 @@ const PTABLE_COLUMN_PROCESS_ARGS = "args";
         }
     }
 
-    process_add = function(name, process, params) {
+    process_create = function(name, process, params) {
         // Generate process
         var p = {};
         p[PTABLE_COLUMN_NAME] = name;
         p[PTABLE_COLUMN_FNC] = process;
         // Default
         p[PTABLE_COLUMN_PID] = process_generate_id();
+        p[PTABLE_COLUMN_TIME_EXEC] = new Date().getTime();
         p[PTABLE_COLUMN_STATE] = PROCESS_STATE_READY;
         if (params) {
             p[PTABLE_COLUMN_PROCESS_ARGS] = params;
         }
         process_table[p[PTABLE_COLUMN_PID]] = p;
+
+        update_ui();
+    }
+
+    process_create_child = function(name, process, params) {
+        // Generate process
+        var p = {};
+        p[PTABLE_COLUMN_NAME] = name;
+        p[PTABLE_COLUMN_FNC] = process;
+        // Default
+        p[PTABLE_COLUMN_PID] = process_generate_id();
+        p[PTABLE_COLUMN_TIME_EXEC] = new Date().getTime();
+        p[PTABLE_COLUMN_STATE] = PROCESS_STATE_READY;
+        if (params) {
+            p[PTABLE_COLUMN_PROCESS_ARGS] = params;
+        }
+        process_table[p[PTABLE_COLUMN_PID]] = p;
+        // Set the parent id
+        process_table[p[PTABLE_COLUMN_PARENT]] = process_get_current();
 
         update_ui();
     }
@@ -77,7 +115,7 @@ const PTABLE_COLUMN_PROCESS_ARGS = "args";
             // Cannot end system task
             return;
         }
-        // Memory cleanup
+        // Automatic memory cleanup
         mem_free(process_table[pid][PTABLE_COLUMN_BASE_REGISTER], process_table[pid][PTABLE_COLUMN_LIMIT_REGISTER]);
         // By removing it from the process table we will not call it anymore
         delete process_table[pid];
@@ -109,10 +147,10 @@ const PTABLE_COLUMN_PROCESS_ARGS = "args";
 
     function update_ui() {
         // Update PROCESS tab
-        var out = "<table><thead><tr><td>PID</td><td>Name</td><td>State</td><td>Base Register</td><td>Limit Register</td></tr></thead><tbody>";
+        var out = "<table><thead><tr><td>PID</td><td>Name</td><td>State</td><td>Base Register</td><td>Limit Register</td><td>NV Base Register</td><td>NV Limit Register</td><td>Time Created</td><td>Parent PID</td><td>Path</td></tr></thead><tbody>";
         for (i in process_table) {
             var p = process_table[i];
-            out += "<tr><td>" + p[PTABLE_COLUMN_PID] + "</td><td>" + p[PTABLE_COLUMN_NAME] + "</td><td>" + p[PTABLE_COLUMN_STATE] + "</td><td>" + p[PTABLE_COLUMN_BASE_REGISTER] + "</td><td>" + p[PTABLE_COLUMN_LIMIT_REGISTER] + "</td></tr>";
+            out += "<tr><td>" + p[PTABLE_COLUMN_PID] + "</td><td>" + p[PTABLE_COLUMN_NAME] + "</td><td>" + p[PTABLE_COLUMN_STATE] + "</td><td>" + p[PTABLE_COLUMN_BASE_REGISTER] + "</td><td>" + p[PTABLE_COLUMN_LIMIT_REGISTER] + "</td><td>" + p[PTABLE_COLUMN_BASE_NVREGISTER] + "</td><td>" + p[PTABLE_COLUMN_LIMIT_NVREGISTER] + "</td><td>" + p[PTABLE_COLUMN_TIME_EXEC] + "</td><td>" + p[PTABLE_COLUMN_PARENT] + "</td><td>" + p[PTABLE_COLUMN_APPLICATION_PATH] + "</td></tr>";
         }
         out += "</tbody></table>";
         $('#tab_1').innerHTML = out;

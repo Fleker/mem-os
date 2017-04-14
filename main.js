@@ -37,7 +37,7 @@ const VERSION_CODE = 1;
              // Don't do anything
          }
 
-         process_add("System Idle Process", idle);
+         process_create("System Idle Process", idle);
          setTimeout(task_scheduler, PROCESS_TIMING_QUANTUM);
          fulfill();
     });
@@ -75,7 +75,7 @@ const VERSION_CODE = 1;
     // Runs a memory test process
     const cmd_mem_test = function(args) {
         var addr = mem_request(12);
-        var out = "Received address " + addr + "<br>";
+        var out = "Received bytes: " + addr + "<br>";
         out += mem_read(0) + " --<br>";
         mem_set(0, 20);
         mem_set(1, 41);

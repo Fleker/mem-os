@@ -9,7 +9,7 @@ function cli_handler() {
     // TODO Handle cases where one 'word' has spaces in quotes
     var cmd = $('#entry').value.toLowerCase();
     cli_history_append(cmd);
-    process_add("Terminal", cli_process, cmd);
+    process_create("Terminal", cli_process, cmd);
     $('#entry').value = ''; // Clear input
 }
 

@@ -4,11 +4,17 @@ var bitmap_init = null;
 var mem_request = null;
 // Reads an address in memory.
 var mem_read = null;
+// Reads an address in memory of a parent process.
+var mem_read_parent = null;
 // Sets an address in memory.
 var mem_set = null;
+// Sets a memory address of a parent process.
+var mem_set_parent = null;
 // Frees a certain amount of memory from a process.
 var mem_free = null;
 
+// The process does not have a parent
+var MEM_ERROR_ORPHAN = -4;
 // The process has more memory already allocated than it requested.
 var MEM_ERROR_PROCESS_MEMORY_OVERLOAD = -3;
 // The system cannot allocate enough memory.
@@ -91,6 +97,7 @@ var MEM_FREE_OK = 0;
                     // Allocate all bytes in node
                     var addr = bitmap[i].value;
                     // Check if memory has already been allocated to process. If so, copy bytes.
+                    // FIXME Try to increase memory allocation in-place if possible
                     if (process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER]) {
                         mem_cpy(process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], addr, process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]);
                     }
@@ -138,7 +145,7 @@ var MEM_FREE_OK = 0;
             bitmap[mem_alloc_index].prev = node;
         }
         bitmap[mem_alloc_index] = node;
-
+        // TODO Group like memory into larger blocks
         update_ui();
         return MEM_FREE_OK;
     }
@@ -149,6 +156,20 @@ var MEM_FREE_OK = 0;
         }
         // Translate to kernel address
         var kaddr = process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER] + addr;
+        return kernel_mem_get(kaddr);
+    }
+
+
+    mem_read_parent = function(addr) {
+        var parent_pid = process_table[process_get_current()][PTABLE_COLUMN_PARENT];
+        if (!parent_pid) {
+            throw MEM_ERROR_ORPHAN;
+        }
+        if (addr > process_table[parent_pid][PTABLE_COLUMN_LIMIT_REGISTER]) {
+            throw MEM_ERROR_BOUNDS;
+        }
+        // Translate to kernel address
+        var kaddr = process_table[parent_pid][PTABLE_COLUMN_BASE_REGISTER] + addr;
         return kernel_mem_get(kaddr);
     }
 
@@ -164,13 +185,37 @@ var MEM_FREE_OK = 0;
         return MEM_WRITE_OK;
     }
 
+    mem_set_parent = function(addr) {
+        var parent_pid = process_table[process_get_current()][PTABLE_COLUMN_PARENT];
+        if (!parent_pid) {
+            throw MEM_ERROR_ORPHAN;
+        }
+        if (addr > process_table[parent_pid][PTABLE_COLUMN_LIMIT_REGISTER]) {
+            throw MEM_ERROR_BOUNDS;
+        }
+        // Translate to kernel address
+        var kaddr = process_table[parent_pid][PTABLE_COLUMN_BASE_REGISTER] + addr;
+        kernel_mem_set(kaddr, val);
+
+        update_ui();
+        return MEM_WRITE_OK;
+    }
+
     function update_ui() {
         // Updates the memory display
         // For entire capacity
         var out = "<table><thead><tr><td>Bytes</td><td>Starting Address</td></thead><tbody>";
         for (var i = 0; i < bitmap.length; i++) {
             var v = (bitmap[i]) ? bitmap[i].value : "Undefined";
-            out += "<tr><td>" + Math.pow(2, i + bitmap_min) + "</td><td>" + v + "</td></tr>";
+            out += "<tr><td>" + Math.pow(2, i + bitmap_min) + "</td><td>" + v;
+            var node = bitmap[i];
+            while (node) {
+                if (node.next) {
+                    out += "->" + node.next.value;
+                }
+                node = node.next;
+            }
+            out += "</td></tr>";
         }
         out += "</tbody></table>";
         $('#tab_2').innerHTML = out;
