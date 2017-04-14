@@ -68,7 +68,7 @@ body {
 
 .tab_label.active {
     font-weight: bold;
-    background-color: #333;
+    background-color: #555;
 }
 
 #tab_1 td, #tab_2 td, #tab_3 td {
@@ -77,6 +77,11 @@ body {
 
 #tab_3 {
     height: calc(100vh - 60px);
+    overflow-y: scroll;
+}
+
+#tab_4 {
+    height: calc(100vh - 80px);
     overflow-y: scroll;
 }
 

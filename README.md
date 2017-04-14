@@ -26,13 +26,16 @@ _An operating system emulator using solely resistive-based memory_
 * Some memory calls throw errors in certain bounding cases.
 
 ### Memory
-* `mem_request(bytes)`
-* `mem_free(addr, bytes)`
+* `mem_request(length)`
+* `mem_free(addr, length)`
 * `mem_read(addr)`
-* `mem_set(addr, bytes)`
+* `mem_read_parent(addr)`
+* `mem_set(addr, data)`
+* `mem_set_parent(addr, data)`
 
 ### Processes
-* `process_add(name, process_function, [args])`
+* `process_create(name, process_function, [args])`
+* `process_create_child(name, process_function, [args])`
 * `process_remove(pid)`
 * `process_remove_self()`
 * `process_get_current()`
@@ -44,3 +47,4 @@ _An operating system emulator using solely resistive-based memory_
 
 ### Known Issues
 * Memory / storage isn't actually that secure due to `localStorage` limitations.
+* One memory cell can technically store a virtually unlimited amount of data.

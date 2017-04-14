@@ -150,6 +150,7 @@ const VERSION_CODE = 1;
         init_dream_journal.then(function() {
             setTimeout(function() {
                 $('#splashscreen').style.display = 'none';
+                show_tab(0); // Show terminal
                 $('#entry').focus();
             }, 2000);
         });

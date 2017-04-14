@@ -55,6 +55,7 @@ var MEM_FREE_OK = 0;
             process_table = kprocess_table;
             is_mem_init = true;
 
+            memory_map_ui_init();
             update_ui();
         }
     }
@@ -151,16 +152,21 @@ var MEM_FREE_OK = 0;
     }
 
     mem_read = function(addr) {
+        memory_map_ui('toread', addr);
         if (addr > process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]) {
             throw MEM_ERROR_BOUNDS;
         }
         // Translate to kernel address
         var kaddr = process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER] + addr;
+
+        memory_map_ui('didread', addr);
         return kernel_mem_get(kaddr);
     }
 
 
     mem_read_parent = function(addr) {
+        memory_map_ui('toread', addr);
+
         var parent_pid = process_table[process_get_current()][PTABLE_COLUMN_PARENT];
         if (!parent_pid) {
             throw MEM_ERROR_ORPHAN;
@@ -170,10 +176,13 @@ var MEM_FREE_OK = 0;
         }
         // Translate to kernel address
         var kaddr = process_table[parent_pid][PTABLE_COLUMN_BASE_REGISTER] + addr;
+
+        memory_map_ui('didread', addr);
         return kernel_mem_get(kaddr);
     }
 
     mem_set = function(addr, val) {
+        memory_map_ui('towrite', addr);
         if (addr > process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]) {
             throw MEM_ERROR_BOUNDS;
         }
@@ -182,10 +191,12 @@ var MEM_FREE_OK = 0;
         kernel_mem_set(kaddr, val);
 
         update_ui();
+        memory_map_ui('didwrite', addr);
         return MEM_WRITE_OK;
     }
 
     mem_set_parent = function(addr) {
+        memory_map_ui('towrite', addr);
         var parent_pid = process_table[process_get_current()][PTABLE_COLUMN_PARENT];
         if (!parent_pid) {
             throw MEM_ERROR_ORPHAN;
@@ -198,6 +209,7 @@ var MEM_FREE_OK = 0;
         kernel_mem_set(kaddr, val);
 
         update_ui();
+        memory_map_ui('didwrite', addr);
         return MEM_WRITE_OK;
     }
 
@@ -227,5 +239,49 @@ var MEM_FREE_OK = 0;
         out += "</tbody></table>";
 
         $('#tab_3').innerHTML = out;
+    }
+
+    function memory_map_ui_init() {
+        console.log("Constructing memory map");
+        var canvas = $('#memory_map');
+        canvas.height = 10240; // Cap = 1024
+        canvas.width = 176;
+        ctx = canvas.getContext('2d');
+        // Capacity = 1024;
+        for (var i = 0; i < 1024; i++) {
+            var val = kernel_mem_get(i);
+            for (var j = 16; j >= 0; j--) {
+                var mask = 1 << j;
+                ctx.fillStyle = (val & mask) ? "#f00" : "#fff";
+                ctx.fillRect((16 - j) * 10, i * 10, 10, 10);
+            }
+        }
+    }
+
+    function memory_map_ui(action, i) {
+        var canvas = $('#memory_map');
+        ctx = canvas.getContext('2d');
+        if (action == 'toread') {
+            for (var j = 16; j >= 0; j--) {
+                var val = kernel_mem_get(i);
+                var mask = 1 << j;
+                ctx.fillStyle = "#00f";
+                ctx.fillRect((16 - j) * 10, i * 10, 10, 10);
+            }
+        } else if (action == "didread" || action == "didwrite") {
+            for (var j = 16; j >= 0; j--) {
+                var val = kernel_mem_get(i);
+                var mask = 1 << j;
+                ctx.fillStyle = (val & mask) ? "#f00" : "#fff";
+                ctx.fillRect((16 - j) * 10, i * 10, 10, 10);
+            }
+        } else if (action == "towrite") {
+            for (var j = 16; j >= 0; j--) {
+                var val = kernel_mem_get(i);
+                var mask = 1 << j;
+                ctx.fillStyle = "#0f0";
+                ctx.fillRect((16 - j) * 10, i * 10, 10, 10);
+            }
+        }
     }
 })();

@@ -10,7 +10,8 @@
                 <td class='tab_label active' id='tab_label_0' onclick='show_tab(0)'>Terminal</td>
                 <td class='tab_label' id='tab_label_1' onclick='show_tab(1)'>Processes</td>
                 <td class='tab_label' id='tab_label_2' onclick='show_tab(2)'>Bitmap</td>
-                <td class='tab_label' id='tab_label_3' onclick='show_tab(3)'>Memory Map</td>
+                <td class='tab_label' id='tab_label_3' onclick='show_tab(3)'>Memory Table</td>
+                <td class='tab_label' id='tab_label_4' onclick="show_tab(4)">Memory Map</td>
             </tr>
         </table>
         <div id='splashscreen'>
@@ -37,6 +38,9 @@
         <div class='tab' id='tab_1'></div>
         <div class='tab' id='tab_2'></div>
         <div class='tab' id='tab_3'></div>
+        <div class='tab' id='tab_4' style="display:none;">
+            <canvas id='memory_map' width='160'></canvas>
+        </div>
         <script src="cli.js"></script>
         <script src="process.js"></script>
         <script src="memory.js"></script>
