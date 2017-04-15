@@ -137,6 +137,10 @@ const VERSION_CODE = 1;
     cli_register("clear", cmd_clear);
     cli_register("about", cmd_about);
 
+    // TODO Reload files and configure bitmap
+    // TODO Delete volatile memory
+    // TODO If never loaded, install everything
+
     boot_state("Remembering...");
 
     mem_init(kernel_mem_exist, kernel_mem_get, kernel_mem_set, process_table);

@@ -216,6 +216,7 @@ var MEM_FREE_OK = 0;
     function update_ui() {
         // Updates the memory display
         // For entire capacity
+        // TODO Make this a promise
         var out = "<table><thead><tr><td>Bytes</td><td>Starting Address</td></thead><tbody>";
         for (var i = 0; i < bitmap.length; i++) {
             var v = (bitmap[i]) ? bitmap[i].value : "Undefined";
@@ -242,6 +243,7 @@ var MEM_FREE_OK = 0;
     }
 
     function memory_map_ui_init() {
+        // TODO Make this a promise
         console.log("Constructing memory map");
         var canvas = $('#memory_map');
         canvas.height = 10240; // Cap = 1024
