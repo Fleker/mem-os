@@ -17,6 +17,7 @@ const VERSION_CODE = 1;
 
 (function() {
     var process_table = [];
+    var file_table = [];
     const init_process = new Promise(function(fulfill, reject) {
         // Schedule idle task
         // As JS passes by reference, we can create the ptable here and pass it into the process manager
@@ -33,13 +34,23 @@ const VERSION_CODE = 1;
             setTimeout(task_scheduler, PROCESS_TIMING_QUANTUM);
         }
 
-         function idle() {
-             // Don't do anything
-         }
+        function idle() {
+            // Don't do anything
+        }
 
-         process_create("System Idle Process", idle);
-         setTimeout(task_scheduler, PROCESS_TIMING_QUANTUM);
-         fulfill();
+        process_create("System Idle Process", idle);
+        setTimeout(task_scheduler, PROCESS_TIMING_QUANTUM);
+
+        mem_init(kernel_mem_exist, kernel_mem_get, kernel_mem_set, process_table);
+        // TODO Load config parameters.
+        // TODO Pass in the offset which is from the file system.
+        // Right now no bytes are used for the file system.
+        bitmap_init(0, 1024); // 1024 8-bit values
+
+        // Init file system
+        filesys_init(file_table);
+
+        fulfill();
     });
 
     const init_dream_journal = new Promise(function(fulfill, reject) {
@@ -142,12 +153,6 @@ const VERSION_CODE = 1;
     // TODO If never loaded, install everything
 
     boot_state("Remembering...");
-
-    mem_init(kernel_mem_exist, kernel_mem_get, kernel_mem_set, process_table);
-    // TODO Load config parameters.
-    // TODO Pass in the offset which is from the file system.
-    // Right now no bytes are used for the file system.
-    bitmap_init(0, 1024); // 1024 8-bit values
 
     init_process.then(function() {
         boot_state("Restarting tasks...");
