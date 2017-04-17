@@ -57,7 +57,7 @@ var MEM_FREE_OK = 0;
 
             memory_map_ui_init();
             update_ui();
-            return kernel_mem_request;
+            return [kernel_mem_request, kernel_mem_free];
         }
     }
 
@@ -159,7 +159,7 @@ var MEM_FREE_OK = 0;
         return bytes;
     }
 
-    mem_free = function(addr, len) {
+    kernel_mem_free = function(addr, len) {
         // Be conservative with how many bytes are being freed.
         var requested_bytes = Math.pow(2, Math.floor(Math.log2(len)));
         var mem_alloc_index = Math.floor(Math.log2(requested_bytes)) - bitmap_min;
@@ -173,6 +173,10 @@ var MEM_FREE_OK = 0;
         // TODO Group like memory into larger blocks
         update_ui();
         return MEM_FREE_OK;
+    }
+
+    mem_free = function(addr, len) {
+        return kernel_mem_free(addr + process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], len);
     }
 
     mem_read = function(addr) {

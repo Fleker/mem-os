@@ -10,6 +10,17 @@ function delay(ms) {
     while (new Date().getTime() - time < ms) {}
 }
 
+// Gets the hardware read duration in nanoseconds.
+var config_get_read_ns = null;
+// Gets the hardware write duration in nanoseconds.
+var config_get_write_ns = null;
+// Gets the hardware energy used per byte read and write.
+var config_get_energy = null;
+// Gets the hardware system capacity.
+var config_get_capacity = null;
+// Gets the hardware clock frequency in GHz.
+var config_get_clock = null;
+
 // Label for the OS version
 const VERSION_NAME = "0.0.1";
 // Numerical build number for OS version
@@ -18,6 +29,9 @@ const VERSION_CODE = 1;
 (function() {
     var process_table = [];
     var kernel_mem_request = null;
+    var kernel_mem_free = null;
+    var config = {};
+
     const init_process = new Promise(function(fulfill, reject) {
         // Schedule idle task
         // As JS passes by reference, we can create the ptable here and pass it into the process manager
@@ -41,17 +55,38 @@ const VERSION_CODE = 1;
         process_create("System Idle Process", idle);
         setTimeout(task_scheduler, PROCESS_TIMING_QUANTUM);
 
-        kernel_mem_request = mem_init(kernel_mem_exist, kernel_mem_get, kernel_mem_set, process_table);
+        var mem_vector = mem_init(kernel_mem_exist, kernel_mem_get, kernel_mem_set, process_table);
+        kernel_mem_request = mem_vector[0];
+        kernel_mem_free = mem_vector[1];
 
         // Init file system
         filesys_init(kernel_mem_get, kernel_mem_set, kernel_mem_exist, kernel_mem_request, process_table);
 
         // Free volatile memory
+        var volatile_memory = JSON.parse(filesys_read('/.volatile'));
+        for (i in volatile_memory) {
+            // Expecting a series of 2-col tables giving the mem address and bytes
+            // Do kernel mem free function
+            kernel_mem_free(volatile_memory[i][0], volatile_memory[i][1]);
+        }
 
-
-        // TODO Inflate `/.config`
-        // TODO Set system configuration parameters
-
+        // Inflate `/.config` and set system configuration parameters
+        var configuration = JSON.parse(filesys_read('/.config'));
+        if (configuration['read_ns']) {
+            config['read_ns'] = configuration['read_ns'] || 1;
+        }
+        if (configuration['write_ns']) {
+            config['write_ns'] = configuration['write_ns'] || 1;
+        }
+        if (configuration['energy']) {
+            config['energy'] = configuration['energy'] || 1;
+        }
+        if (configuration['capacity']) {
+            config['capacity'] = configuration['capacity'] || 1;
+        }
+        if (configuration['clock']) {
+            config['clock'] = configuration['clock'] || 3;
+        }
         fulfill();
     });
 
@@ -60,6 +95,26 @@ const VERSION_CODE = 1;
         journal_init(process_table);
         fulfill();
     })
+
+    config_get_read_ns = function() {
+        return config['read_ns'];
+    }
+
+    config_get_write_ns = function() {
+        return config['write_ns'];
+    }
+
+    config_get_energy = function() {
+        return config['energy'];
+    }
+
+    config_get_capacity = function() {
+        return config['capacity'];
+    }
+
+    config_get_clock = function() {
+        return config['clock'];
+    }
 
     const cmd_shutdown = function(args) {
         if (args[1] == "-r") {
@@ -152,9 +207,7 @@ const VERSION_CODE = 1;
     cli_register("clear", cmd_clear);
     cli_register("about", cmd_about);
 
-    // TODO Reload files and configure bitmap
     // TODO Delete volatile memory
-    // TODO If never loaded, install everything
 
     boot_state("Remembering...");
 

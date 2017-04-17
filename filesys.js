@@ -111,20 +111,18 @@ const FILESYS_OP_OK = 0;
                  // Create .config
                 filesys_create(FILE_CONFIG, 777);
                 kernel_filesys_open(FILE_CONFIG);
-                var config = "# This file allows different system configurations to be changed";
+                var config = "{/* This file allows system parameters to be changed */}";
                 kernel_filesys_write(FILE_CONFIG, config);
                 filesys_close(FILE_CONFIG);
-            } else {
-                // TODO Read data
             }
 
             const FILE_BITMAP = '/.bitmap';
             if (!filesys_exists(FILE_BITMAP)) {
-                // Create .bitmap
+                // Create bitmap
                 filesys_create(FILE_BITMAP, 777);
-                // TODO Load config parameters.
-                // TODO Pass in the offset which is from the file system.
-                var bitmap = bitmap_init(1, 1024); // 1024 8-bit values
+                // Pass in the offset which is from the file system.
+                // If the capacity is now lower, some data will be cut-off. Some things may not work as expected.
+                var bitmap = bitmap_init(1, config_get_capacity()); // 1024 8-bit values
                 // TODO Bitmap update function
                 kernel_filesys_open(FILE_BITMAP);
                 kernel_filesys_write(FILE_BITMAP, JSON.stringify(bitmap));
@@ -144,10 +142,6 @@ const FILESYS_OP_OK = 0;
                 // TODO Allow memory changes to write to file
                 kernel_filesys_write(FILE_VOLATILE_MEMORY, JSON.stringify([]));
                 filesys_close(FILE_VOLATILE_MEMORY);
-            } else {
-                // Open and free
-                // TODO Implement
-                mem_free_volatile(filesys_read('/.volatile'));
             }
 
             const FILE_DREAM_JOURNAL = '/.dream-journal';
@@ -535,13 +529,16 @@ const FILESYS_OP_OK = 0;
         // Get process name
         var path = process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH];
         // Open our `.data` file for the process and save these two parameters to recall later.
-        // TODO Have a nv-mem reinflation when we start the process and assign its path.
         const FILENAME = path + '.data';
         if (!filesys_exists(FILENAME)) {
             filesys_create(FILENAME, 777);
         }
+        // FIXME Try to increase memory allocation in-place if possible
+        if (process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER]) {
+            mem_cpy(process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], addr, process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]);
+        }
         try {
-            var vector = filesys_access_file(path + '.data');
+            var vector = filesys_access_file(FILENAME);
             var directory = vector[0];
             var directoryAddr = vector[1];
             var fn = vector[2];
@@ -551,6 +548,7 @@ const FILESYS_OP_OK = 0;
             kernel_filesys_open(FILENAME);
             kernel_filesys_write(FILENAME, addr + ',' + bytes);
             kernel_filesys_close(FILENAME);
+            return bytes;
         } catch (e) {
             throw e;
         }
@@ -619,6 +617,7 @@ const FILESYS_OP_OK = 0;
     }
 
     nvmem_free = function(addr, len) {
+        addr = addr + process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER]
         // Be conservative with how many bytes are being freed.
         var requested_bytes = Math.pow(2, Math.floor(Math.log2(len)));
         var mem_alloc_index = Math.floor(Math.log2(requested_bytes)) - bitmap_min;
