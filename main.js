@@ -57,6 +57,7 @@ const VERSION_CODE = 1;
 
     const init_dream_journal = new Promise(function(fulfill, reject) {
         // TODO Complete system tasks where needed.
+        journal_init(process_table);
         fulfill();
     })
 
