@@ -24,6 +24,9 @@ _An operating system emulator using solely resistive-based memory_
 * The current process is the only one running. System calls are based on obtaining the current process and performing a table lookup.
 * Terminal commands are run in a sandbox, with their own memory pool.
 * Some memory calls throw errors in certain bounding cases.
+* Values in memory, if not set, will be set through an "installation" process
+    * Memory location `0` contains the root directory
+    * Memory location `1` contains `/.config`
 
 ### Files
 In most computer systems you have a standard user file system in "user space". With every application writing directly to non-volatile memory, each app can allocate both volatile and non-volatile memory blocks. When the system restarts, all volatile memory blocks keep their previous value. If allocated, the new process must take care to clear the values themselves. Non-volatile memory is stored in a specific `.data` file in their script's location. This file is hidden and inaccessible to other processes. 

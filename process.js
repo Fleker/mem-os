@@ -2,7 +2,7 @@ const PROCESS_STATE_WAITING = 1;
 const PROCESS_STATE_READY = 2;
 const PROCESS_STATE_ACTIVE = 3;
 
-const PROCESS_TIMING_QUANTUM = 1000; // Milliseconds
+const PROCESS_TIMING_QUANTUM = 300; // Milliseconds
 const PROCESS_MAX = 1000; // For over this number of processes, the system cannot generate a uniuqe id
 
 // Define function headers

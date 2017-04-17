@@ -33,8 +33,8 @@ var MEM_FREE_OK = 0;
     var process_table = null;
     var is_mem_init = false;
     var is_bitmap_init = false;
-    // Lowest possible block of memory is 4 bytes
-    const bitmap_min = 2; // 2 ^ _2_ = 4
+    // Lowest possible block of memory is 1 byte(s)
+    const bitmap_min = 0; // 2 ^ _0_ = 1
 
     /*
      * Copies `len` bytes of data from `addr1` to `addr2`. Overwrites.
@@ -57,6 +57,7 @@ var MEM_FREE_OK = 0;
 
             memory_map_ui_init();
             update_ui();
+            return kernel_mem_request;
         }
     }
 
@@ -79,7 +80,11 @@ var MEM_FREE_OK = 0;
         }
     }
 
-    mem_request = function(bytes) {
+    // This kernel-level function finds available blocks of memory
+    //   and provides the starting memory address. Combined with the
+    //   number of blocks allocated, this should be able to give
+    //   a process all of the addresses it wants.
+    function kernel_mem_request(bytes) {
         // We are using a version of Quick Fit to quickly allocate memory.
         // This is an array of linked nodes.
         // Try to over-allocate memory.
@@ -97,21 +102,17 @@ var MEM_FREE_OK = 0;
                 if (i == mem_alloc_index) {
                     // Allocate all bytes in node
                     var addr = bitmap[i].value;
-                    // Check if memory has already been allocated to process. If so, copy bytes.
-                    // FIXME Try to increase memory allocation in-place if possible
-                    if (process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER]) {
-                        mem_cpy(process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], addr, process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]);
-                    }
-
-                    process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER] = addr;
-                    process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER] = requested_bytes;
+                    // TODO Add these values to a memory table file.
                     // Remove from bitmap
                     bitmap[i] = bitmap[i].next;
                     if (bitmap[i]) {
                         bitmap[i].prev = null;
                     }
                     update_ui();
-                    return requested_bytes;
+                    // Return the address in our kernel function. If we're doing something in
+                    //   userspace, we should hide the raw address. We can use this address
+                    //   for something other than a process.
+                    return addr;
                 } else {
                     // Splice node's bytes in half.
                     var newLength = Math.pow(2, i - 1 + bitmap_min);
@@ -127,12 +128,28 @@ var MEM_FREE_OK = 0;
                     bitmap[i - 1] = addr1;
                     bitmap[i - 1].prev = null;
                     // Go through the process again until we find memory.
-                    return mem_request(bytes);
+                    return kernel_mem_request(bytes);
                 }
             }
         }
         // TODO Handle a memory allocation script
         throw MEM_ERROR_ALLOCATION;
+    }
+
+    mem_request = function(bytes) {
+        // This will return the address with the bytes now allocated.
+        var addr = kernel_mem_request(bytes);
+        // Put this into our process table with some checks.
+        // Check if memory has already been allocated to process. If so, copy bytes.
+        // FIXME Try to increase memory allocation in-place if possible
+        if (process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER]) {
+            mem_cpy(process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], addr, process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]);
+        }
+
+        process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER] = addr;
+        process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER] = requested_bytes;
+        // Return amount of bytes allocated
+        return bytes;
     }
 
     mem_free = function(addr, len) {
