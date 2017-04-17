@@ -17,6 +17,9 @@ _An operating system emulator using solely resistive-based memory_
     * Lower-level than I plan on implementing.
 * Separate memory / storage systems
     * As this is simulating a system with a joint memory/storage, this isn't something I plan on implementing.
+    
+## What is that thing?
+This is the mascot of MemOS, MemGiraffre.
 
 ## Developing for MemOS
 
@@ -26,7 +29,9 @@ _An operating system emulator using solely resistive-based memory_
 * Some memory calls throw errors in certain bounding cases.
 * Values in memory, if not set, will be set through an "installation" process
     * Memory location `0` contains the root directory
-    * Memory location `1` contains `/.config`
+
+### MemOS Development Notes
+* Many tricky functions throw errors. You will have to `try` and `catch` to do exception handling.
 
 ### Files
 In most computer systems you have a standard user file system in "user space". With every application writing directly to non-volatile memory, each app can allocate both volatile and non-volatile memory blocks. When the system restarts, all volatile memory blocks keep their previous value. If allocated, the new process must take care to clear the values themselves. Non-volatile memory is stored in a specific `.data` file in their script's location. This file is hidden and inaccessible to other processes. 

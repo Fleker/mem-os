@@ -64,6 +64,12 @@ var MEM_FREE_OK = 0;
     var bitmap = [];
     bitmap_init = function(offset, length) {
         if (!is_bitmap_init) {
+            if (typeof offset == "object") {
+                // We can just use this bitmap instead, inflated from storage.
+                bitmap = offset;
+                return FILESYS_OP_OK;
+            }
+
             var start = Math.log2(length); // We start from here.
             var mem_remaining = length;
             while (mem_remaining > bitmap_min) {
@@ -77,6 +83,7 @@ var MEM_FREE_OK = 0;
             // Exit once we've got memory in each location
             is_bitmap_init = true;
             update_ui();
+            return bitmap;
         }
     }
 

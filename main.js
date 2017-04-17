@@ -42,13 +42,13 @@ const VERSION_CODE = 1;
         setTimeout(task_scheduler, PROCESS_TIMING_QUANTUM);
 
         kernel_mem_request = mem_init(kernel_mem_exist, kernel_mem_get, kernel_mem_set, process_table);
-        // TODO Load config parameters.
-        // TODO Pass in the offset which is from the file system.
-        // Right now no bytes are used for the file system.
-        bitmap_init(0, 1024); // 1024 8-bit values
 
         // Init file system
-        filesys_init(kernel_mem_get, kernel_mem_set, kernel_mem_exist, kernel_mem_request);
+        filesys_init(kernel_mem_get, kernel_mem_set, kernel_mem_exist, kernel_mem_request, process_table);
+
+        // Free volatile memory
+
+
         // TODO Inflate `/.config`
         // TODO Set system configuration parameters
 
