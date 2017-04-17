@@ -176,21 +176,20 @@ var MEM_FREE_OK = 0;
     }
 
     mem_read = function(addr) {
-        memory_map_ui('toread', addr);
         if (addr > process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]) {
             throw MEM_ERROR_BOUNDS;
         }
         // Translate to kernel address
         var kaddr = process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER] + addr;
+        memory_map_ui('toread', kaddr);
 
-        memory_map_ui('didread', addr);
-        return kernel_mem_get(kaddr);
+        var result = kernel_mem_get(kaddr);
+        memory_map_ui('didread', kaddr);
+        return result;
     }
 
 
     mem_read_parent = function(addr) {
-        memory_map_ui('toread', addr);
-
         var parent_pid = process_table[process_get_current()][PTABLE_COLUMN_PARENT];
         if (!parent_pid) {
             throw MEM_ERROR_ORPHAN;
@@ -200,27 +199,28 @@ var MEM_FREE_OK = 0;
         }
         // Translate to kernel address
         var kaddr = process_table[parent_pid][PTABLE_COLUMN_BASE_REGISTER] + addr;
+        memory_map_ui('toread', kaddr);
 
-        memory_map_ui('didread', addr);
-        return kernel_mem_get(kaddr);
+        var result = kernel_mem_get(kaddr);
+        memory_map_ui('didread', kaddr);
+        return result;
     }
 
     mem_set = function(addr, val) {
-        memory_map_ui('towrite', addr);
         if (addr > process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]) {
             throw MEM_ERROR_BOUNDS;
         }
         // Translate to kernel address
         var kaddr = process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER] + addr;
+        memory_map_ui('towrite', kaddr);
         kernel_mem_set(kaddr, val);
 
         update_ui();
-        memory_map_ui('didwrite', addr);
+        memory_map_ui('didwrite', kaddr);
         return MEM_WRITE_OK;
     }
 
     mem_set_parent = function(addr) {
-        memory_map_ui('towrite', addr);
         var parent_pid = process_table[process_get_current()][PTABLE_COLUMN_PARENT];
         if (!parent_pid) {
             throw MEM_ERROR_ORPHAN;
@@ -230,10 +230,11 @@ var MEM_FREE_OK = 0;
         }
         // Translate to kernel address
         var kaddr = process_table[parent_pid][PTABLE_COLUMN_BASE_REGISTER] + addr;
+        memory_map_ui('towrite', kaddr);
         kernel_mem_set(kaddr, val);
 
         update_ui();
-        memory_map_ui('didwrite', addr);
+        memory_map_ui('didwrite', kaddr);
         return MEM_WRITE_OK;
     }
 
