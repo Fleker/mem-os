@@ -41,7 +41,7 @@ const VERSION_CODE = 1;
             // Iterate through every process and execute it.
             // Simple round robin implementation. No priority.
             for (i in process_table) {
-                // TODO Handle Process Waiting State
+                // TODO Handle Process Waiting State with semaphores
                 var p = process_table[i];
                 process_exec(p);
             }
@@ -66,10 +66,16 @@ const VERSION_CODE = 1;
         // Free volatile memory
         var volatile_memory = JSON.parse(filesys_read('/.volatile'));
         for (i in volatile_memory) {
+            var vm = volatile_memory[i];
             // Expecting a series of 2-col tables giving the mem address and bytes
             // Do kernel mem free function
-            kernel_mem_free(volatile_memory[i][0], volatile_memory[i][1]);
+            kernel_mem_free(vm[0], vm[1]);
         }
+        // Now we can reset that file entirely
+        const FILENAME = '/.volatile';
+        filesys_open(FILENAME);
+        filesys_write(FILENAME, JSON.stringify([]));
+        filesys_close(FILENAME);
 
         // Inflate `/.config` and set system configuration parameters
         var configuration = JSON.parse(filesys_read('/.config'));

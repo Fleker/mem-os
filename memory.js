@@ -117,6 +117,12 @@ const MEM_FREE_OK = 0;
                         bitmap[i].prev = null;
                     }
                     update_ui();
+                    // Save change
+                    const FILENAME = '/.bitmap';
+                    filesys_open(FILENAME);
+                    filesys_write(FILENAME, JSON.stringify(bitmap));
+                    filesys_close(FILENAME);
+
                     // Return the address in our kernel function. If we're doing something in
                     //   userspace, we should hide the raw address. We can use this address
                     //   for something other than a process.
@@ -195,6 +201,11 @@ const MEM_FREE_OK = 0;
         update_capacity(-len);
         // TODO Group like memory into larger blocks
         update_ui();
+        // Save changes
+        const FILENAME = '/.bitmap';
+        filesys_open(FILENAME);
+        filesys_write(FILENAME, JSON.stringify(bitmap));
+        filesys_close(FILENAME);
         return MEM_FREE_OK;
     }
 

@@ -130,7 +130,6 @@ const FILESYS_OP_OK = 0;
                 // Pass in the offset which is from the file system.
                 // If the capacity is now lower, some data will be cut-off. Some things may not work as expected.
                 var bitmap = bitmap_init(1, config_get_capacity()); // 1024 8-bit values
-                // TODO Bitmap update function
                 kernel_filesys_open(FILE_BITMAP);
                 kernel_filesys_write(FILE_BITMAP, JSON.stringify(bitmap));
                 filesys_close(FILE_BITMAP);
@@ -146,7 +145,6 @@ const FILESYS_OP_OK = 0;
                 // Create
                 filesys_create(FILE_VOLATILE_MEMORY, 777);
                 kernel_filesys_open(FILE_VOLATILE_MEMORY);
-                // TODO Allow memory changes to write to file
                 kernel_filesys_write(FILE_VOLATILE_MEMORY, JSON.stringify([]));
                 filesys_close(FILE_VOLATILE_MEMORY);
             }
@@ -156,12 +154,8 @@ const FILESYS_OP_OK = 0;
                 // Create
                 filesys_create(FILE_DREAM_JOURNAL, 777);
                 kernel_filesys_open(FILE_DREAM_JOURNAL);
-                // TODO Allow memory changes to write to file
                 kernel_filesys_write(FILE_DREAM_JOURNAL, JSON.stringify([]));
                 filesys_close(FILE_DREAM_JOURNAL);
-            } else {
-                // Open and inflate
-                // TODO Implement
             }
 
             // File capacity contains allocation count of filesystem, nv, and v memory
@@ -170,7 +164,6 @@ const FILESYS_OP_OK = 0;
                 // Create
                 filesys_create(FILE_CAPACITY, 777);
                 kernel_filesys_open(FILE_CAPACITY);
-                // TODO Allow memory changes to write to file
                 // 6 is the base filesystem size.
                 kernel_filesys_write(FILE_CAPACITY, JSON.stringify([6, 0, 0]));
                 filesys_close(FILE_CAPACITY);
@@ -561,7 +554,6 @@ const FILESYS_OP_OK = 0;
 
     nvmem_request = function(bytes) {
         update_capacity(1, bytes);
-        // TODO Update bitmap file
 
         // Request memory
         var addr = kernel_mem_request(bytes);
@@ -658,7 +650,6 @@ const FILESYS_OP_OK = 0;
     nvmem_free = function(addr, len) {
          var prevLength = process_table[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER];
         // Reallocate memory in process table
-        // TODO Update bitmap file
         if (addr < 0 || addr + len > prevLength) {
             throw MEM_ERROR_BOUNDS;
         }
