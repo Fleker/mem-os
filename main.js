@@ -30,6 +30,7 @@ const VERSION_CODE = 1;
     var process_table = [];
     var kernel_mem_request = null;
     var kernel_mem_free = null;
+    var kernel_journal_pop_entry = null;
     var config = {};
 
     const init_process = new Promise(function(fulfill, reject) {
@@ -92,7 +93,38 @@ const VERSION_CODE = 1;
 
     const init_dream_journal = new Promise(function(fulfill, reject) {
         // TODO Complete system tasks where needed.
-        journal_init(process_table);
+        var vector = journal_init(process_table);
+        kernel_journal_pop_entry = vector[1];
+        filesys_journal_init(vector[0], vector[1]);
+
+        var remaining_tasks = kernel_journal_pop_entry();
+        while (remaining_tasks) {
+            // Split up our message to parse.
+            var task = remaining_tasks.split(',');
+            if (task[0] == "Update") {
+                var delta = task[1];
+                var FILENAME = '/.capacity';
+                filesys_open(FILENAME);
+                var capacity = JSON.parse(filesys_read(FILENAME));
+                capacity[index] += delta;
+                filesys_write(FILENAME, JSON.stringify(capacity));
+                filesys_close(FILENAME);
+            } else if (task[0] == "Free") {
+                var addr = task[1];
+                kernel_mem_free(addr, 1);
+            } else if (task[0] == "Delete") {
+                var directoryAddr = task[1];
+                var fn = task[2];
+                // Inflate directory
+                var directory = JSON.parse(kernel_mem_get(directoryAddr));
+                delete directory[fn];
+                // Now save
+                kernel_mem_set(directoryAddr, JSON.stringify(directory));
+            }
+
+            remaining_tasks = kernel_journal_pop_entry();
+        }
+
         fulfill();
     })
 
@@ -182,18 +214,29 @@ const VERSION_CODE = 1;
         return "~MemOS~<br>An OS emulator for resistive-based memory<br>Find out more in our project write-up.<br>version " + VERSION_NAME + "  (" + VERSION_CODE + ")";
     }
 
+    const cmd_read = function(args) {
+        // TODO Handle . and ..
+        return filesys_read(args[1]);
+    }
+
     const kernel_mem_exist = function(addr) {
-        // TODO Verify address
+        if (addr < 0 || addr >= config_get_capacity()) {
+            throw MEM_ERROR_KERNEL_BOUNDS;
+        }
         return mem_get(addr) != undefined;
     }
 
     const kernel_mem_get = function(addr) {
-        // TODO Verify address
+        if (addr < 0 || addr >= config_get_capacity()) {
+            throw MEM_ERROR_KERNEL_BOUNDS;
+        }
         return localStorage['memos_memory_' + addr];
     }
 
     const kernel_mem_set = function(addr, val) {
-        // TODO Verify address
+        if (addr < 0 || addr >= config_get_capacity()) {
+            throw MEM_ERROR_KERNEL_BOUNDS;
+        }
         localStorage['memos_memory_' + addr] = val;
     }
 
@@ -202,12 +245,13 @@ const VERSION_CODE = 1;
     cli_register("shutdown", cmd_shutdown);
     cli_register("processes", cmd_process);
     cli_register("help", cmd_help);
+    cli_register("questions", cmd_help);
+    cli_register("questions?", cmd_help);
     cli_register("memtest", cmd_mem_test);
     cli_register("kill", cmd_kill);
     cli_register("clear", cmd_clear);
     cli_register("about", cmd_about);
-
-    // TODO Delete volatile memory
+    cli_register("read", cmd_read);
 
     boot_state("Remembering...");
 

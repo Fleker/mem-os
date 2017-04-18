@@ -13,18 +13,20 @@ var mem_set_parent = null;
 // Frees a certain amount of memory from a process.
 var mem_free = null;
 
-// The process does not have a parent
-var MEM_ERROR_ORPHAN = -4;
+// Memory address issue found in the kernel.
+const MEM_ERROR_KERNEL_BOUNDS = -5;
+// The process does not have a parent.
+const MEM_ERROR_ORPHAN = -4;
 // The process has more memory already allocated than it requested.
-var MEM_ERROR_PROCESS_MEMORY_OVERLOAD = -3;
+const MEM_ERROR_PROCESS_MEMORY_OVERLOAD = -3;
 // The system cannot allocate enough memory.
-var MEM_ERROR_ALLOCATION = -2;
+const MEM_ERROR_ALLOCATION = -2;
 // The process requested memory it cannot access.
-var MEM_ERROR_BOUNDS = -1;
+const MEM_ERROR_BOUNDS = -1;
 // Data was successfully written to the memory structure.
-var MEM_WRITE_OK = 0;
+const MEM_WRITE_OK = 0;
 // Memory was successfully freed.
-var MEM_FREE_OK = 0;
+const MEM_FREE_OK = 0;
 
 (function() {
     var kernel_mem_exists = null;
@@ -109,7 +111,6 @@ var MEM_FREE_OK = 0;
                 if (i == mem_alloc_index) {
                     // Allocate all bytes in node
                     var addr = bitmap[i].value;
-                    // TODO Add these values to a memory table file.
                     // Remove from bitmap
                     bitmap[i] = bitmap[i].next;
                     if (bitmap[i]) {
@@ -139,16 +140,36 @@ var MEM_FREE_OK = 0;
                 }
             }
         }
-        // TODO Handle a memory allocation script
+        // TODO Handle a memory compaction script
         throw MEM_ERROR_ALLOCATION;
+    }
+
+    function update_capacity(delta) {
+        const FILENAME = '/.capacity';
+        filesys_open(FILENAME);
+        var capacity = JSON.parse(filesys_read(FILENAME));
+        capacity[2] += delta;
+        filesys_write(FILENAME, JSON.stringify(capacity));
+        filesys_close(FILENAME);
     }
 
     mem_request = function(bytes) {
         // This will return the address with the bytes now allocated.
         var addr = kernel_mem_request(bytes);
+        // Add these values to a memory table file.
+        const FILENAME = '/.volatile';
+        filesys_open(FILENAME);
+        var volatile = JSON.parse(filesys_read(FILENAME));
+        volatile[process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]] = [addr, bytes];
+        filesys_write(FILENAME, JSON.stringify(volatile));
+        filesys_close(FILENAME);
+        // Update our memory file
+        update_capacity(bytes);
+
         // Put this into our process table with some checks.
         // Check if memory has already been allocated to process. If so, copy bytes.
         // FIXME Try to increase memory allocation in-place if possible
+
         if (process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER]) {
             mem_cpy(process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], addr, process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]);
         }
@@ -170,13 +191,36 @@ var MEM_FREE_OK = 0;
             bitmap[mem_alloc_index].prev = node;
         }
         bitmap[mem_alloc_index] = node;
+        // Update our capacity
+        update_capacity(-len);
         // TODO Group like memory into larger blocks
         update_ui();
         return MEM_FREE_OK;
     }
 
     mem_free = function(addr, len) {
-        return kernel_mem_free(addr + process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], len);
+        var prevLength = process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER];
+        // Reallocate memory in process table
+        if (addr < 0 || addr + len > prevLength) {
+            throw MEM_ERROR_BOUNDS;
+        }
+        // We need to make sure a proper chunk of memory is freed to avoid splitting process memory.
+        if (addr == 0) {
+            // Crop length
+            process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER] -= len;
+        } else {
+            process_table[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER] = addr;
+        }
+
+        // Update our memory file
+        const FILENAME = '/.volatile';
+        filesys_open(FILENAME);
+        var volatile = JSON.parse(filesys_read(FILENAME));
+        volatile[process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]] = [process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]];
+        filesys_write(FILENAME, JSON.stringify(volatile));
+        filesys_close(FILENAME);
+
+        return kernel_mem_free(process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]);
     }
 
     mem_read = function(addr) {
@@ -245,48 +289,51 @@ var MEM_FREE_OK = 0;
     function update_ui() {
         // Updates the memory display
         // For entire capacity
-        // TODO Make this a promise
-        var out = "<table><thead><tr><td>Bytes</td><td>Starting Address</td></thead><tbody>";
-        for (var i = 0; i < bitmap.length; i++) {
-            var v = (bitmap[i]) ? bitmap[i].value : "Undefined";
-            out += "<tr><td>" + Math.pow(2, i + bitmap_min) + "</td><td>" + v;
-            var node = bitmap[i];
-            while (node) {
-                if (node.next) {
-                    out += "->" + node.next.value;
+        new Promise(function(fulfill, reject) {
+            var out = "<table><thead><tr><td>Bytes</td><td>Starting Address</td></thead><tbody>";
+            for (var i = 0; i < bitmap.length; i++) {
+                var v = (bitmap[i]) ? bitmap[i].value : "Undefined";
+                out += "<tr><td>" + Math.pow(2, i + bitmap_min) + "</td><td>" + v;
+                var node = bitmap[i];
+                while (node) {
+                    if (node.next) {
+                        out += "->" + node.next.value;
+                    }
+                    node = node.next;
                 }
-                node = node.next;
+                out += "</td></tr>";
             }
-            out += "</td></tr>";
-        }
-        out += "</tbody></table>";
-        $('#tab_2').innerHTML = out;
+            out += "</tbody></table>";
+            $('#tab_2').innerHTML = out;
 
-        out = "<table><thead><tr><td>Address</td><td>Value</td></thead><tbody>";
-        for (var i = 0; i < 1024; i++) {
-            out += "<tr><td>0x" + i.toString(16) + "</td><td class='mem_cell'>" + kernel_mem_get(i) + "</td></tr>";
-        }
-        out += "</tbody></table>";
+            out = "<table><thead><tr><td>Address</td><td>Value</td></thead><tbody>";
+            for (var i = 0; i < config_get_capacity(); i++) {
+                out += "<tr><td>0x" + i.toString(16) + "</td><td class='mem_cell'>" + kernel_mem_get(i) + "</td></tr>";
+            }
+            out += "</tbody></table>";
 
-        $('#tab_3').innerHTML = out;
+            $('#tab_3').innerHTML = out;
+            fulfill();
+        }).then();
     }
 
     function memory_map_ui_init() {
-        // TODO Make this a promise
-        console.log("Constructing memory map");
-        var canvas = $('#memory_map');
-        canvas.height = 10240; // Cap = 1024
-        canvas.width = 176;
-        ctx = canvas.getContext('2d');
-        // Capacity = 1024;
-        for (var i = 0; i < 1024; i++) {
-            var val = kernel_mem_get(i);
-            for (var j = 16; j >= 0; j--) {
-                var mask = 1 << j;
-                ctx.fillStyle = (val & mask) ? "#f00" : "#fff";
-                ctx.fillRect((16 - j) * 10, i * 10, 10, 10);
+        new Promise(function(fulfill, reject) {
+            console.log("Constructing memory map");
+            var canvas = $('#memory_map');
+            canvas.height = config_get_capacity() * 10;
+            canvas.width = 176;
+            ctx = canvas.getContext('2d');
+            for (var i = 0; i < config_get_capacity(); i++) {
+                var val = kernel_mem_get(i);
+                for (var j = 16; j >= 0; j--) {
+                    var mask = 1 << j;
+                    ctx.fillStyle = (val & mask) ? "#f00" : "#fff";
+                    ctx.fillRect((16 - j) * 10, i * 10, 10, 10);
+                }
             }
-        }
+            fulfill();
+        }).then();
     }
 
     function memory_map_ui(action, i) {

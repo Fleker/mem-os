@@ -32,6 +32,7 @@ This is the mascot of MemOS, MemGiraffre.
 
 ### MemOS Development Notes
 * Many tricky functions throw errors. You will have to `try` and `catch` to do exception handling.
+* A process does not _need_ a `path` for basic functions, but will need it to handle files or non-volatile memory.
 
 ### Files
 In most computer systems you have a standard user file system in "user space". With every application writing directly to non-volatile memory, each app can allocate both volatile and non-volatile memory blocks. When the system restarts, all volatile memory blocks keep their previous value. If allocated, the new process must take care to clear the values themselves. Non-volatile memory is stored in a specific `.data` file in their script's location. This file is hidden and inaccessible to other processes. 

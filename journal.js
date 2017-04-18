@@ -27,14 +27,15 @@ var JOURNAL_OP_OK = 0;
         if (!is_journal_init) {
             process_table = ptable;
             is_journal_init = true;
+            return [kernel_journal_add_entry, kernel_journal_pop_entry];
         }
     }
 
-    journal_add_entry = function(entry_data) {
+    kernel_journal_add_entry = function(entry_data, path_name) {
         // Inflate journal
         filesys_open(FILE_DREAM_JOURNAL);
         var dj = JSON.parse(filesys_read(FILE_DREAM_JOURNAL));
-        var path = process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH];
+        var path = path_name || '/.kernel';
         if (!path) {
             throw JOURNAL_ERROR_NO_PROCESS_PATH;
         }
@@ -51,11 +52,18 @@ var JOURNAL_OP_OK = 0;
         return JOURNAL_OP_OK;
     }
 
-    journal_pop_entry = function() {
+    journal_add_entry = function(entry_data) {
+        if (!process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]) {
+            throw JOURNAL_ERROR_NO_PROCESS_PATH;
+        }
+        return kernel_journal_add_entry(entry_data, process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
+    }
+
+    kernel_journal_pop_entry = function(path_name) {
         // Inflate journal
         filesys_open(FILE_DREAM_JOURNAL);
         var dj = JSON.parse(filesys_read(FILE_DREAM_JOURNAL));
-        var path = process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH];
+        var path = path_name || '/.kernel';
         if (!path) {
             throw JOURNAL_ERROR_NO_PROCESS_PATH;
         }
@@ -70,6 +78,13 @@ var JOURNAL_OP_OK = 0;
         filesys_write(FILE_DREAM_JOURNAL, JSON.stringify(dj));
         filesys_close(FILE_DREAM_JOURNAL);
         return result;
+    }
+
+    journal_pop_entry = function() {
+        if (!process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]) {
+            throw JOURNAL_ERROR_NO_PROCESS_PATH;
+        }
+        return kernel_journal_pop_entry(process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
     }
 
     journal_count = function() {

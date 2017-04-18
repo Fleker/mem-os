@@ -6,6 +6,8 @@
  */
 // Inits file system.
 var filesys_init = null;
+// Inits journal system hooks in filesys
+var filesys_journal_init = null;
 // Creates a file.
 var filesys_create = null;
 // Opens a file and locks it.
@@ -66,6 +68,8 @@ FTABLE_COLUMN_CHILDREN = "children";
 FTABLE_COLUMN_ADDRESS = "address";
 // The process path that has a lock on the file. As these locks persist after restart, cannot just store the process id. If invalid, file isn't locked.
 FTABLE_COLUMN_LOCK = "lock";
+// The address in memory of the file's parent (if it exists).
+FTABLE_COLUMN_PADDRESS = "paddress";
 
 // One cannot a non-empty directory
 const FILESYS_ERROR_NONEMPTY_DIR = -7;
@@ -90,6 +94,9 @@ const FILESYS_OP_OK = 0;
     var kernel_mem_set = null;
     var kernel_mem_exist = null;
     var kernel_mem_request = null;
+    var kernel_journal_add_entry = null;
+    var kernel_journal_pop_entry = null;
+
     var is_filesys_init = false;
     var current_directory = "/";
     filesys_init = function(kmg, kms, kme, kmr, ptable) {
@@ -170,6 +177,15 @@ const FILESYS_OP_OK = 0;
             }
 
             is_filesys_init = true;
+        }
+    }
+
+    var is_filesys_journal_init = false;
+    filesys_journal_init = function(kjae, kjpe) {
+        if (!is_filesys_journal_init) {
+            kernel_journal_add_entry = kjae;
+            kernel_journal_pop_entry = kjpe;
+            is_filesys_journal_init = true;
         }
     }
 
@@ -397,9 +413,13 @@ const FILESYS_OP_OK = 0;
             }
             var fn = path[path.length - 1];
             directory[fn] = {}; // Empty directory
-            // TODO Update file size.
+            var addr = kernel_mem_request(1);
+            directory[fn][FTABLE_COLUMN_ADDRESS] = addr;
+            directory[fn][FTABLE_COLUMN_CHILDREN] = 1;
+            update_capacity(0, 1);
             // TODO parent children count.
             kernel_mem_set(directoryAddr, JSON.stringify(directory));
+            kernel_mem_set(addr, JSON.stringify({}));
         } catch (e) {
             throw e;
         }
@@ -421,12 +441,20 @@ const FILESYS_OP_OK = 0;
             var directoryAddr = vector[1];
             var fn = vector[2];
 
-            // TODO Dream journal entries.
-            // TODO handle necessary deletions in the system idle task.
-             // TODO Update our directory children count.
-            // TODO Update our filesystem's storage count.
+            // TODO Update our directory children count.
+            kernel_journal_add_entry("Update,-1");
+            update_capacity(0, -1);
+            // Pop our last entry and add another
+            kernel_journal_pop_entry();
+
+            kernel_journal_add_entry("Free," + directory[fn][FTABLE_COLUMN_ADDRESS]);
             mem_free(directory[fn][FTABLE_COLUMN_ADDRESS], 1);
+            kernel_journal_pop_entry();
+
+            kernel_journal_add_entry("Delete," + directoryAddr + "," + fn);
             delete directory[fn];
+            kernel_journal_pop_entry();
+
             kernel_mem_set(directoryAddr, JSON.stringify(directory));
             return FILESYS_OP_OK;
         } catch (e) {
@@ -453,7 +481,7 @@ const FILESYS_OP_OK = 0;
                 throw FILESYS_ERROR_NONEMPTY_DIR;
             }
             // TODO Update our directory children count.
-            // TODO Update our filesystem's storage count.
+            update_capacity(0, -1);
             mem_free(directory[fn][FTABLE_COLUMN_ADDRESS], 1);
             delete directory[fn];
             kernel_mem_set(directoryAddr, JSON.stringify(directory));
@@ -479,7 +507,7 @@ const FILESYS_OP_OK = 0;
             directory[fn][FTABLE_COLUMN_CHILDREN] = 0; // Because it's a file.
             // Save our directory back in its address.
             // TODO Update our directory children count.
-            // TODO Update our filesystem's storage count.
+            update_capacity(0, 1);
             kernel_mem_set(directoryAddr, JSON.stringify(directory));
         } catch (e) {
             throw e;
@@ -518,14 +546,25 @@ const FILESYS_OP_OK = 0;
         kernel_mem_set(0, JSON.stringify({}));
     }
 
+    function update_capacity(index, delta) {
+        const FILENAME = '/.capacity';
+        filesys_open(FILENAME);
+        var capacity = JSON.parse(filesys_read(FILENAME));
+        capacity[index] += delta;
+        filesys_write(FILENAME, JSON.stringify(capacity));
+        filesys_close(FILENAME);
+    }
+
     // Shows details in the file explorer tab
     function update_ui() {
     }
 
     nvmem_request = function(bytes) {
+        update_capacity(1, bytes);
+        // TODO Update bitmap file
+
         // Request memory
         var addr = kernel_mem_request(bytes);
-        // TODO Mem copy
         // Get process name
         var path = process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH];
         // Open our `.data` file for the process and save these two parameters to recall later.
@@ -617,7 +656,24 @@ const FILESYS_OP_OK = 0;
     }
 
     nvmem_free = function(addr, len) {
-        addr = addr + process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER]
+         var prevLength = process_table[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER];
+        // Reallocate memory in process table
+        // TODO Update bitmap file
+        if (addr < 0 || addr + len > prevLength) {
+            throw MEM_ERROR_BOUNDS;
+        }
+        // We need to make sure a proper chunk of memory is freed to avoid splitting process memory.
+        if (addr == 0) {
+            // Crop length
+            process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER] = len;
+        } else {
+            process_table[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER] = addr;
+        }
+
+        // Update capacity
+        update_capacity(1, -len);
+        addr = process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER];
+        len  = process_table[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER];
         // Be conservative with how many bytes are being freed.
         var requested_bytes = Math.pow(2, Math.floor(Math.log2(len)));
         var mem_alloc_index = Math.floor(Math.log2(requested_bytes)) - bitmap_min;
