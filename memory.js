@@ -12,6 +12,8 @@ var mem_set = null;
 var mem_set_parent = null;
 // Frees a certain amount of memory from a process.
 var mem_free = null;
+// Updates display - for UI purposes
+var update_memory_ui = null;
 
 // Memory address issue found in the kernel.
 const MEM_ERROR_KERNEL_BOUNDS = -5;
@@ -32,15 +34,18 @@ const MEM_FREE_OK = 0;
     var kernel_mem_exists = null;
     var kernel_mem_get = null;
     var kernel_mem_set = null;
+    var kernel_mem_request = null;
+    var kernel_mem_free = null;
     var kernel_filesys_open = null;
     var kernel_filesys_read = null;
     var kernel_filesys_write = null;
     var kernel_filesys_close = null;
+    var update_capacity = null;
     var process_table = null;
     var is_mem_init = false;
     var is_bitmap_init = false;
-    // Lowest possible block of memory is 1 byte(s)
-    const bitmap_min = 0; // 2 ^ _0_ = 1
+    var bitmap_min = null;
+    var bitmap = [];
 
     /*
      * Copies `len` bytes of data from `addr1` to `addr2`. Overwrites.
@@ -52,26 +57,31 @@ const MEM_FREE_OK = 0;
         }
     }
 
-    mem_init = function(kme, kmg, kms, kprocess_table, kfo, kfw, kfc, kfr) {
+    mem_init = function(kme, kmg, kms, kprocess_table, kfo, kfw, kfc, kfr, kmf, kmr, bm, bit, uvc) {
         // Pass functions in from the kernel
         if (!is_mem_init) {
             kernel_mem_exists = kme;
             kernel_mem_get = kmg;
             kernel_mem_set = kms;
+            kernel_mem_free = kmf;
+            kernel_mem_request = kmr;
             process_table = kprocess_table;
             kernel_filesys_open = kfo;
             kernel_filesys_read = kfr;
             kernel_filesys_write = kfw;
             kernel_filesys_close = kfc;
+            bitmap_min = bm;
+            bitmap = bit;
+            update_capacity = uvc;
+
             is_mem_init = true;
 
             memory_map_ui_init();
-            update_ui();
+            update_memory_ui();
             return [kernel_mem_request, kernel_mem_free];
         }
     }
 
-    var bitmap = [];
     bitmap_init = function(offset, length) {
         if (!is_bitmap_init) {
             if (typeof offset == "object") {
@@ -92,77 +102,9 @@ const MEM_FREE_OK = 0;
             }
             // Exit once we've got memory in each location
             is_bitmap_init = true;
-            update_ui();
+            update_memory_ui();
             return bitmap;
         }
-    }
-
-    // This kernel-level function finds available blocks of memory
-    //   and provides the starting memory address. Combined with the
-    //   number of blocks allocated, this should be able to give
-    //   a process all of the addresses it wants.
-    function kernel_mem_request(bytes) {
-        // We are using a version of Quick Fit to quickly allocate memory.
-        // This is an array of linked nodes.
-        // Try to over-allocate memory.
-        // We need to check the bitmap.
-
-        var requested_bytes = Math.pow(2, Math.ceil(Math.log2(bytes)));
-        var mem_alloc_index = Math.floor(Math.log2(requested_bytes)) - bitmap_min;
-        for (var i = mem_alloc_index; i < bitmap.length; i++) {
-            if (bitmap[i]) {
-                // Allocate memory
-                if (i == mem_alloc_index) {
-                    // Allocate all bytes in node
-                    var addr = bitmap[i].value;
-                    // Remove from bitmap
-                    bitmap[i] = bitmap[i].next;
-                    if (bitmap[i]) {
-                        bitmap[i].prev = null;
-                    }
-                    update_ui();
-                    // Save change if possible. This may not be possible IF our bitmap file is being created now.
-                    const FILENAME = '/.bitmap';
-                    if (filesys_exists(FILENAME)) {
-                        kernel_filesys_open(FILENAME);
-                        kernel_filesys_write(FILENAME, JSON.stringify(bitmap));
-                        kernel_filesys_close(FILENAME);
-                    }
-
-                    // Return the address in our kernel function. If we're doing something in
-                    //   userspace, we should hide the raw address. We can use this address
-                    //   for something other than a process.
-                    return addr;
-                } else {
-                    // Splice node's bytes in half.
-                    var newLength = Math.pow(2, i - 1 + bitmap_min);
-                    var addr1 = new Node(bitmap[i]);
-                    var addr2 = new Node(bitmap[i].value + newLength);
-                    addr2.next = bitmap[i - 1];
-                    addr2.prev = addr1;
-                    addr1.next = addr2;
-                    bitmap[i] = bitmap[i].next;
-                    if (bitmap[i]) {
-                        bitmap[i].prev = null;
-                    }
-                    bitmap[i - 1] = addr1;
-                    bitmap[i - 1].prev = null;
-                    // Go through the process again until we find memory.
-                    return kernel_mem_request(bytes);
-                }
-            }
-        }
-        // TODO Handle a memory compaction script
-        throw MEM_ERROR_ALLOCATION;
-    }
-
-    function update_capacity(delta) {
-        const FILENAME = '/.capacity';
-        kernel_filesys_open(FILENAME);
-        var capacity = JSON.parse(kernel_filesys_read(FILENAME));
-        capacity[2] += delta;
-        kernel_filesys_write(FILENAME, JSON.stringify(capacity));
-        kernel_filesys_close(FILENAME);
     }
 
     mem_request = function(bytes) {
@@ -195,29 +137,6 @@ const MEM_FREE_OK = 0;
         process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER] = requested_bytes;
         // Return amount of bytes allocated
         return bytes;
-    }
-
-    kernel_mem_free = function(addr, len) {
-        // Be conservative with how many bytes are being freed.
-        var requested_bytes = Math.pow(2, Math.floor(Math.log2(len)));
-        var mem_alloc_index = Math.floor(Math.log2(requested_bytes)) - bitmap_min;
-        // Create a new node to put back into bitmap
-        var node = new Node(addr);
-        node.next = bitmap[mem_alloc_index];
-        if (bitmap[mem_alloc_index]) {
-            bitmap[mem_alloc_index].prev = node;
-        }
-        bitmap[mem_alloc_index] = node;
-        // Update our capacity
-        update_capacity(-len);
-        // TODO Group like memory into larger blocks
-        update_ui();
-        // Save changes
-        const FILENAME = '/.bitmap';
-        kernel_filesys_open(FILENAME);
-        kernel_filesys_write(FILENAME, JSON.stringify(bitmap));
-        kernel_filesys_close(FILENAME);
-        return MEM_FREE_OK;
     }
 
     mem_free = function(addr, len) {
@@ -308,7 +227,7 @@ const MEM_FREE_OK = 0;
         return MEM_WRITE_OK;
     }
 
-    function update_ui() {
+    update_memory_ui = function() {
         // Updates the memory display
         // For entire capacity
         new Promise(function(fulfill, reject) {
