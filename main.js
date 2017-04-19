@@ -60,7 +60,7 @@ const VERSION_CODE = 2;
         var mem_vector = mem_init(kernel_mem_exists, kernel_mem_get, kernel_mem_set, process_table, kernel_filesys_open, kernel_filesys_write, kernel_filesys_close, kernel_filesys_read, kernel_mem_free, kernel_mem_request, bitmap_min, bitmap, update_volatile_capacity);
 
         // Init file system
-        filesys_init(kernel_mem_get, kernel_mem_set, kernel_mem_exists, kernel_mem_request, process_table, kernel_filesys_open, kernel_filesys_access_file, kernel_filesys_close, kernel_filesys_write, kernel_filesys_read);
+        filesys_init(kernel_mem_get, kernel_mem_set, kernel_mem_exists, kernel_mem_request, process_table, kernel_filesys_open, kernel_filesys_access_file, kernel_filesys_close, kernel_filesys_write, kernel_filesys_read, kernel_mem_free);
 
         // Free volatile memory
         var volatile_memory = JSON.parse(kernel_filesys_read('/.volatile'));
@@ -228,6 +228,7 @@ const VERSION_CODE = 2;
 
     const cmd_read = function(args) {
         // TODO Handle . and ..
+        // TODO Handle a current directory
         try {
             return filesys_read(args[1]);
         } catch(e) {
@@ -280,11 +281,24 @@ const VERSION_CODE = 2;
 
     const cmd_rm = function(args) {
         // Handle factory reset
-        // TODO implement
+        if (args[1] == "/" && args[2] == "-rf") {
+            delete localStorage;
+            return "All data was deleted /shrug";
+        }
+        try {
+            filesys_delete_file(args[1]);
+            return args[1] + " was removed";
+        } catch(e) {
+            return "Error " + e;
+        }
     }
 
     const cmd_edit = function(args) {
-        // TODO implement
+        try {
+            var vector = kernel_filesys_access_file(args[1]);
+        } catch(e) {
+            return "Error " + e;
+        }
     }
 
     /*
@@ -343,7 +357,7 @@ const VERSION_CODE = 2;
                     const FILENAME = '/.bitmap';
                     if (filesys_exists(FILENAME)) {
                         kernel_filesys_open(FILENAME);
-                        kernel_filesys_write(FILENAME, JSON.stringify(bitmap));
+                        kernel_filesys_write(FILENAME, JSON.stringify(kernel_flatten_bitmap(bitmap)));
                         kernel_filesys_close(FILENAME);
                     }
 
@@ -392,9 +406,27 @@ const VERSION_CODE = 2;
         // Save changes
         const FILENAME = '/.bitmap';
         kernel_filesys_open(FILENAME);
-        kernel_filesys_write(FILENAME, JSON.stringify(bitmap));
+        kernel_filesys_write(FILENAME, JSON.stringify(kernel_flatten_bitmap(bitmap)));
         kernel_filesys_close(FILENAME);
         return MEM_FREE_OK;
+    }
+
+    function kernel_flatten_bitmap(bitmap) {
+        // Turn bitmap into a standard matrix
+        var bmtx = [];
+        for (i in bitmap) {
+            var n = bitmap[i];
+            if (n) {
+                bmtx[i] = [n.value];
+                while (n.next) {
+                    n = n.next;
+                    bmtx[i].push(n.value);
+                }
+            } else {
+                bmtx[i] = [];
+            }
+        }
+        return bmtx;
     }
 
     /*
@@ -569,6 +601,8 @@ const VERSION_CODE = 2;
     cli_register("about", cmd_about);
     cli_register("read", cmd_read);
     cli_register("ls", cmd_ls);
+    cli_register("rm", cmd_rm);
+    cli_register("edit", cmd_edit);
 
     boot_state("Remembering...");
 

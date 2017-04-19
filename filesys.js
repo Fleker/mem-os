@@ -94,6 +94,7 @@ const FILESYS_OP_OK = 0;
     var kernel_mem_set = null;
     var kernel_mem_exist = null;
     var kernel_mem_request = null;
+    var kernel_mem_free = null;
     var kernel_journal_add_entry = null;
     var kernel_journal_pop_entry = null;
     var kernel_filesys_open = null;
@@ -104,7 +105,7 @@ const FILESYS_OP_OK = 0;
 
     var is_filesys_init = false;
     var current_directory = "/";
-    filesys_init = function(kmg, kms, kme, kmr, ptable, kfo, kfaf, kfc, kfw, kfr) {
+    filesys_init = function(kmg, kms, kme, kmr, ptable, kfo, kfaf, kfc, kfw, kfr, kmf) {
         if (!is_filesys_init) {
             kernel_mem_get = kmg;
             kernel_mem_set = kms;
@@ -116,6 +117,7 @@ const FILESYS_OP_OK = 0;
             kernel_filesys_close = kfc;
             kernel_filesys_write = kfw;
             kernel_filesys_read = kfr;
+            kernel_mem_free = kmf;
 
             // Inflate file system into browser memory
             filesys_table = JSON.parse(kernel_mem_get(0));
@@ -167,7 +169,7 @@ const FILESYS_OP_OK = 0;
                 // Create
                 filesys_create(FILE_DREAM_JOURNAL, 777);
                 kernel_filesys_open(FILE_DREAM_JOURNAL);
-                kernel_filesys_write(FILE_DREAM_JOURNAL, JSON.stringify([]));
+                kernel_filesys_write(FILE_DREAM_JOURNAL, JSON.stringify({}));
                 kernel_filesys_close(FILE_DREAM_JOURNAL);
             }
 
@@ -357,7 +359,7 @@ const FILESYS_OP_OK = 0;
 
     filesys_delete_file = function(filename) {
          try {
-            var vector = filesys_access_file(filename);
+            var vector = kernel_filesys_access_file(filename);
             var directory = vector[0];
             var directoryAddr = vector[1];
             var fn = vector[2];
@@ -371,7 +373,7 @@ const FILESYS_OP_OK = 0;
             // Pop our last entry and add another
             kernel_journal_pop_entry();
 
-            mem_free(directory[fn][FTABLE_COLUMN_ADDRESS], 1);
+            kernel_mem_free(directory[fn][FTABLE_COLUMN_ADDRESS], 1);
             kernel_journal_pop_entry();
 
             delete directory[fn];
@@ -404,7 +406,7 @@ const FILESYS_OP_OK = 0;
             }
             // TODO Update our directory children count.
             update_capacity(0, -1);
-            mem_free(directory[fn][FTABLE_COLUMN_ADDRESS], 1);
+            kernel_mem_free(directory[fn][FTABLE_COLUMN_ADDRESS], 1);
             delete directory[fn];
             kernel_mem_set(directoryAddr, JSON.stringify(directory));
             return FILESYS_OP_OK;
@@ -454,11 +456,11 @@ const FILESYS_OP_OK = 0;
         if (!filesys_exists(FILENAME)) {
             return FILESYS_ERROR_FILE_NOT_FOUND; // Returns error code, doesn't throw error.
         }
-        filesys_open(FILENAME);
-        var capacity = JSON.parse(filesys_read(FILENAME));
+        kernel_filesys_open(FILENAME);
+        var capacity = JSON.parse(kernel_filesys_read(FILENAME));
         capacity[index] += delta;
-        filesys_write(FILENAME, JSON.stringify(capacity));
-        filesys_close(FILENAME);
+        kernel_filesys_write(FILENAME, JSON.stringify(capacity));
+        kernel_filesys_close(FILENAME);
         return FILESYS_OP_OK;
     }
 

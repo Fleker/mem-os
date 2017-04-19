@@ -81,11 +81,33 @@ const MEM_FREE_OK = 0;
         }
     }
 
+    function inflate_bitmap(bmtx) {
+        // Convert into linked list-array
+        var bitmap = [];
+        for (i in bmtx) {
+            var head = null;
+            var prev = null;
+            for (j in bmtx[i]) {
+                var n = new Node(bmtx[i][j]);
+                if (prev) {
+                    n.prev = prev;
+                    prev.next = n;
+                } else {
+                    head = n;
+                }
+                // Iterate to next
+                prev = n;
+            }
+            bitmap[i] = head;
+        }
+        return bitmap;
+    }
+
     bitmap_init = function(offset, length) {
         if (!is_bitmap_init) {
             if (typeof offset == "object") {
                 // We can just use this bitmap instead, inflated from storage.
-                bitmap = offset;
+                bitmap = inflate_bitmap(offset);
                 memory_map_ui_init();
                 update_memory_ui();
                 return FILESYS_OP_OK;
