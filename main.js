@@ -22,9 +22,9 @@ var config_get_capacity = null;
 var config_get_clock = null;
 
 // Label for the OS version
-const VERSION_NAME = "0.0.1";
+const VERSION_NAME = "0.1.0";
 // Numerical build number for OS version
-const VERSION_CODE = 1;
+const VERSION_CODE = 2;
 
 (function() {
     var process_table = [];
@@ -58,7 +58,7 @@ const VERSION_CODE = 1;
         process_create("System Idle Process", idle);
         setTimeout(task_scheduler, PROCESS_TIMING_QUANTUM);
 
-        var mem_vector = mem_init(kernel_mem_exists, kernel_mem_get, kernel_mem_set, process_table, kernel_filesys_open, kernel_filesys_write, kernel_filesys_close);
+        var mem_vector = mem_init(kernel_mem_exists, kernel_mem_get, kernel_mem_set, process_table, kernel_filesys_open, kernel_filesys_write, kernel_filesys_close, kernel_filesys_read);
         kernel_mem_request = mem_vector[0];
         kernel_mem_free = mem_vector[1];
 

@@ -33,6 +33,7 @@ const MEM_FREE_OK = 0;
     var kernel_mem_get = null;
     var kernel_mem_set = null;
     var kernel_filesys_open = null;
+    var kernel_filesys_read = null;
     var kernel_filesys_write = null;
     var kernel_filesys_close = null;
     var process_table = null;
@@ -51,7 +52,7 @@ const MEM_FREE_OK = 0;
         }
     }
 
-    mem_init = function(kme, kmg, kms, kprocess_table, kfo, kfw, kfc) {
+    mem_init = function(kme, kmg, kms, kprocess_table, kfo, kfw, kfc, kfr) {
         // Pass functions in from the kernel
         if (!is_mem_init) {
             kernel_mem_exists = kme;
@@ -59,6 +60,7 @@ const MEM_FREE_OK = 0;
             kernel_mem_set = kms;
             process_table = kprocess_table;
             kernel_filesys_open = kfo;
+            kernel_filesys_read = kfr;
             kernel_filesys_write = kfw;
             kernel_filesys_close = kfc;
             is_mem_init = true;
@@ -156,11 +158,11 @@ const MEM_FREE_OK = 0;
 
     function update_capacity(delta) {
         const FILENAME = '/.capacity';
-        filesys_open(FILENAME);
-        var capacity = JSON.parse(filesys_read(FILENAME));
+        kernel_filesys_open(FILENAME);
+        var capacity = JSON.parse(kernel_filesys_read(FILENAME));
         capacity[2] += delta;
-        filesys_write(FILENAME, JSON.stringify(capacity));
-        filesys_close(FILENAME);
+        kernel_filesys_write(FILENAME, JSON.stringify(capacity));
+        kernel_filesys_close(FILENAME);
     }
 
     mem_request = function(bytes) {
@@ -212,9 +214,9 @@ const MEM_FREE_OK = 0;
         update_ui();
         // Save changes
         const FILENAME = '/.bitmap';
-        filesys_open(FILENAME);
-        filesys_write(FILENAME, JSON.stringify(bitmap));
-        filesys_close(FILENAME);
+        kernel_filesys_open(FILENAME);
+        kernel_filesys_write(FILENAME, JSON.stringify(bitmap));
+        kernel_filesys_close(FILENAME);
         return MEM_FREE_OK;
     }
 
@@ -234,11 +236,11 @@ const MEM_FREE_OK = 0;
 
         // Update our memory file
         const FILENAME = '/.volatile';
-        filesys_open(FILENAME);
+        kernel_filesys_open(FILENAME);
         var volatile = JSON.parse(filesys_read(FILENAME));
         volatile[process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]] = [process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]];
-        filesys_write(FILENAME, JSON.stringify(volatile));
-        filesys_close(FILENAME);
+        kernel_filesys_write(FILENAME, JSON.stringify(volatile));
+        kernel_filesys_close(FILENAME);
 
         return kernel_mem_free(process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]);
     }
