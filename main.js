@@ -228,11 +228,54 @@ const VERSION_CODE = 2;
 
     const cmd_read = function(args) {
         // TODO Handle . and ..
-        return filesys_read(args[1]);
+        try {
+            return filesys_read(args[1]);
+        } catch(e) {
+            switch (e) {
+                case FILESYS_ERROR_FILE_NOT_FOUND:
+                    return "File not found";
+                default:
+                    return "Read error " + e;
+            }
+        }
     }
 
     const cmd_ls = function(args) {
-        // TODO implement
+        // TODO Handle a current directory
+        // First get a link to the directory
+        try {
+            var vector = kernel_filesys_access_dir(args[1]);
+            var directory = vector[0];
+            var directoryAddr = vector[1];
+            // TODO Allow for grid or list or expanded table
+            if (args.indexOf('-lv') > -1) {
+                // Verbose list view
+                var names = "<table><thead><tr><td>Access</td><td>Filename</td><td>Lock</td><td>Children</td><td>Memory Address</td></tr></thead><tbody>";
+                for (i in directory) {
+                    names += "<tr><td>" + directory[i][FTABLE_COLUMN_ACCESS] + "</td><td>" + i + "</td><td>" + directory[i][FTABLE_COLUMN_LOCK] + "</td><td>" + directory[i][FTABLE_COLUMN_CHILDREN] + "</td><td>" + directory[i][FTABLE_COLUMN_ADDRESS] + "</td></tr>";
+                }
+                return names + "</tbody></table>";
+            } else if (args.indexOf('-l') > -1) {
+                // List view
+                var names = "";
+                for (i in directory) {
+                    names += i + "<br>";
+                }
+                return names;
+            } else if (args.indexOf('-j') > -1) {
+                // Return JSON string
+                return JSON.stringify(directory);
+            } else {
+                // Grid view
+                var names = "";
+                for (i in directory) {
+                    names += i + "&emsp;";
+                }
+                return names;
+            }
+        } catch(e) {
+            return "Navigation error " + e;
+        }
     }
 
     const cmd_rm = function(args) {
@@ -371,17 +414,47 @@ const VERSION_CODE = 2;
         var directoryAddr = 0;
         for (var i = 1; i < path.length - 1; i++) {
             // Traverse file system
-            if (dothrow && !root[path[i]]) {
+            if (dothrow && !directory[path[i]]) {
                 throw FILESYS_ERROR_FILE_NOT_FOUND;
             }
-            directory = root[path[i]];
-            directoryAddr = root[path[i]][FTABLE_COLUMN_ADDRESS];
+            directory = directory[path[i]];
+            directoryAddr = directory[path[i]][FTABLE_COLUMN_ADDRESS];
         }
         if (dothrow && !directory[path[path.length - 1]]) {
             throw FILESYS_ERROR_FILE_NOT_FOUND;
         }
         if (dothrow && directory[path[path.length - 1]][FTABLE_COLUMN_CHILDREN]) {
             throw FILESYS_ERROR_ISNT_FILE;
+        }
+        var fn = path[path.length - 1];
+        return [directory, directoryAddr, fn];
+    }
+
+        // Traverses file structure and returns vector of relevant data
+    const kernel_filesys_access_dir = function(filename, dothrow) {
+        if (typeof dothrow == "undefined") {
+            // Default to throwing errors
+            dothrow = true;
+        }
+        // First, navigate to the directory
+        var path = filename.split('/');
+        // Inflate file system
+        var root = JSON.parse(kernel_mem_get(0));
+        var directory = root;
+        var directoryAddr = 0;
+        for (var i = 1; i < path.length - 1; i++) {
+            // Traverse file system
+            if (path[i] == "") {
+                continue; // Ignore any trailing slashes
+            }
+            if (dothrow && !directory[path[i]]) {
+                throw FILESYS_ERROR_FILE_NOT_FOUND;
+            }
+            directory = directory[path[i]];
+            directoryAddr = directory[path[i]][FTABLE_COLUMN_ADDRESS];
+        }
+        if (dothrow && !directory) {
+            throw FILESYS_ERROR_FILE_NOT_FOUND;
         }
         var fn = path[path.length - 1];
         return [directory, directoryAddr, fn];
@@ -495,6 +568,7 @@ const VERSION_CODE = 2;
     cli_register("clear", cmd_clear);
     cli_register("about", cmd_about);
     cli_register("read", cmd_read);
+    cli_register("ls", cmd_ls);
 
     boot_state("Remembering...");
 
