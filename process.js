@@ -49,7 +49,7 @@ const PTABLE_COLUMN_TIME_EXEC = "time";
 const PTABLE_COLUMN_PROCESS_ARGS = "args";
 
 (function() {
-
+    // TODO Reclaim nv memory
     var is_process_init = false;
 
     var process_table = undefined;

@@ -28,12 +28,14 @@ const VERSION_CODE = 1;
 
 (function() {
     var process_table = [];
+    // TODO Move all kernel-level functions to this file and pass them in to function inits
     var kernel_mem_request = null;
     var kernel_mem_free = null;
     var kernel_journal_pop_entry = null;
     var config = {};
 
-    const init_process = new Promise(function(fulfill, reject) {
+//    const init_process = new Promise(function(fulfill, reject) {
+    const init_process = function() {
         // Schedule idle task
         // As JS passes by reference, we can create the ptable here and pass it into the process manager
         process_init(process_table);
@@ -56,15 +58,15 @@ const VERSION_CODE = 1;
         process_create("System Idle Process", idle);
         setTimeout(task_scheduler, PROCESS_TIMING_QUANTUM);
 
-        var mem_vector = mem_init(kernel_mem_exist, kernel_mem_get, kernel_mem_set, process_table);
+        var mem_vector = mem_init(kernel_mem_exists, kernel_mem_get, kernel_mem_set, process_table, kernel_filesys_open, kernel_filesys_write, kernel_filesys_close);
         kernel_mem_request = mem_vector[0];
         kernel_mem_free = mem_vector[1];
 
         // Init file system
-        filesys_init(kernel_mem_get, kernel_mem_set, kernel_mem_exist, kernel_mem_request, process_table);
+        filesys_init(kernel_mem_get, kernel_mem_set, kernel_mem_exists, kernel_mem_request, process_table, kernel_filesys_open, kernel_filesys_access_file, kernel_filesys_close, kernel_filesys_write, kernel_filesys_read);
 
         // Free volatile memory
-        var volatile_memory = JSON.parse(filesys_read('/.volatile'));
+        var volatile_memory = JSON.parse(kernel_filesys_read('/.volatile'));
         for (i in volatile_memory) {
             var vm = volatile_memory[i];
             // Expecting a series of 2-col tables giving the mem address and bytes
@@ -73,12 +75,12 @@ const VERSION_CODE = 1;
         }
         // Now we can reset that file entirely
         const FILENAME = '/.volatile';
-        filesys_open(FILENAME);
-        filesys_write(FILENAME, JSON.stringify([]));
-        filesys_close(FILENAME);
+        kernel_filesys_open(FILENAME);
+        kernel_filesys_write(FILENAME, JSON.stringify([]));
+        kernel_filesys_close(FILENAME);
 
         // Inflate `/.config` and set system configuration parameters
-        var configuration = JSON.parse(filesys_read('/.config'));
+        var configuration = JSON.parse(kernel_filesys_read('/.config'));
         if (configuration['read_ns']) {
             config['read_ns'] = configuration['read_ns'] || 1;
         }
@@ -94,45 +96,52 @@ const VERSION_CODE = 1;
         if (configuration['clock']) {
             config['clock'] = configuration['clock'] || 3;
         }
-        fulfill();
-    });
+//        fulfill();
+//    });
+    }
 
-    const init_dream_journal = new Promise(function(fulfill, reject) {
+//    const init_dream_journal = new Promise(function(fulfill, reject) {
+    const init_dream_journal = function() {
         // TODO Complete system tasks where needed.
-        var vector = journal_init(process_table);
+        var vector = journal_init(process_table, kernel_filesys_open, kernel_filesys_write, kernel_filesys_close, kernel_filesys_read);
         kernel_journal_pop_entry = vector[1];
         filesys_journal_init(vector[0], vector[1]);
 
-        var remaining_tasks = kernel_journal_pop_entry();
-        while (remaining_tasks) {
-            // Split up our message to parse.
-            var task = remaining_tasks.split(',');
-            if (task[0] == "Update") {
-                var delta = task[1];
-                var FILENAME = '/.capacity';
-                filesys_open(FILENAME);
-                var capacity = JSON.parse(filesys_read(FILENAME));
-                capacity[index] += delta;
-                filesys_write(FILENAME, JSON.stringify(capacity));
-                filesys_close(FILENAME);
-            } else if (task[0] == "Free") {
-                var addr = task[1];
-                kernel_mem_free(addr, 1);
-            } else if (task[0] == "Delete") {
-                var directoryAddr = task[1];
-                var fn = task[2];
-                // Inflate directory
-                var directory = JSON.parse(kernel_mem_get(directoryAddr));
-                delete directory[fn];
-                // Now save
-                kernel_mem_set(directoryAddr, JSON.stringify(directory));
-            }
+        try {
+            var remaining_tasks = kernel_journal_pop_entry();
+            while (remaining_tasks) {
+                // Split up our message to parse.
+                var task = remaining_tasks.split(',');
+                if (task[0] == "Update") {
+                    var delta = task[1];
+                    var FILENAME = '/.capacity';
+                    filesys_open(FILENAME);
+                    var capacity = JSON.parse(filesys_read(FILENAME));
+                    capacity[index] += delta;
+                    filesys_write(FILENAME, JSON.stringify(capacity));
+                    filesys_close(FILENAME);
+                } else if (task[0] == "Free") {
+                    var addr = task[1];
+                    kernel_mem_free(addr, 1);
+                } else if (task[0] == "Delete") {
+                    var directoryAddr = task[1];
+                    var fn = task[2];
+                    // Inflate directory
+                    var directory = JSON.parse(kernel_mem_get(directoryAddr));
+                    delete directory[fn];
+                    // Now save
+                    kernel_mem_set(directoryAddr, JSON.stringify(directory));
+                }
 
-            remaining_tasks = kernel_journal_pop_entry();
+                remaining_tasks = kernel_journal_pop_entry();
+            }
+        } catch(e) {
+            console.info("There are no tasks to resume");
         }
 
-        fulfill();
-    })
+//        fulfill();
+//    });
+    }
 
     config_get_read_ns = function() {
         return config['read_ns'];
@@ -206,7 +215,7 @@ const VERSION_CODE = 1;
                 return e.message;
             }
         } else {
-            return "Usage : kill [pid]<br>pid - Process id. Can be obtained by running `processes`.";
+            return "Usage : kill [pid]<br>pid - Process id. Can be obtained by executing `processes`.";
         }
     }
 
@@ -225,7 +234,25 @@ const VERSION_CODE = 1;
         return filesys_read(args[1]);
     }
 
-    const kernel_mem_exist = function(addr) {
+    const cmd_ls = function(args) {
+        // TODO implement
+    }
+
+    const cmd_rm = function(args) {
+        // Handle factory reset
+        // TODO implement
+    }
+
+    const cmd_edit = function(args) {
+        // TODO implement
+    }
+
+    /*
+     * Here are all of our Kernel Functions. These are passed into other components for sandbox purposes.
+     *
+     * Our Kernel Memory Functions
+     */
+    const kernel_mem_exists = function(addr) {
         if (addr < 0 || addr >= config_get_capacity()) {
             throw MEM_ERROR_KERNEL_BOUNDS;
         }
@@ -246,6 +273,122 @@ const VERSION_CODE = 1;
         localStorage['memos_memory_' + addr] = val;
     }
 
+    /*
+     * Our Kernel File System Functions
+     */
+    // Traverses file structure and returns vector of relevant data
+    const kernel_filesys_access_file = function(filename, dothrow) {
+        if (typeof dothrow == "undefined") {
+            // Default to throwing errors
+            dothrow = true;
+        }
+        // First, navigate to the directory
+        var path = filename.split('/');
+        // Inflate file system
+        var root = JSON.parse(kernel_mem_get(0));
+        var directory = root;
+        var directoryAddr = 0;
+        for (var i = 1; i < path.length - 1; i++) {
+            // Traverse file system
+            if (dothrow && !root[path[i]]) {
+                throw FILESYS_ERROR_FILE_NOT_FOUND;
+            }
+            directory = root[path[i]];
+            directoryAddr = root[path[i]][FTABLE_COLUMN_ADDRESS];
+        }
+        if (dothrow && !directory[path[path.length - 1]]) {
+            throw FILESYS_ERROR_FILE_NOT_FOUND;
+        }
+        if (dothrow && directory[path[path.length - 1]][FTABLE_COLUMN_CHILDREN]) {
+            throw FILESYS_ERROR_ISNT_FILE;
+        }
+        var fn = path[path.length - 1];
+        return [directory, directoryAddr, fn];
+    }
+    // Opens up a file with respect to the kernel, so locking it with a special path that doesn't resolve.
+    const kernel_filesys_open = function(filename, process_path) {
+        process_path = process_path || "/.kernel";
+        try {
+            var vector = kernel_filesys_access_file(filename);
+            var directory = vector[0];
+            var directoryAddr = vector[1];
+            var fn = vector[2];
+
+            if (directory[fn][FTABLE_COLUMN_LOCK] && directory[fn][FTABLE_COLUMN_LOCK] != process_path) {
+                throw FILESYS_ERROR_WRITE_LOCK;
+            }
+
+            directory[fn][FTABLE_COLUMN_LOCK] = process_path;
+
+            kernel_mem_set(directoryAddr, JSON.stringify(directory));
+        } catch (e) {
+            throw e;
+        }
+    }
+    // Opens up a file with respect to the kernel, so locking it with a special path that doesn't resolve.
+    const kernel_filesys_read = function(filename, process_path) {
+        process_path = process_path || "/.kernel";
+        try {
+            var vector = kernel_filesys_access_file(filename);
+            var directory = vector[0];
+            var directoryAddr = vector[1];
+            var fn = vector[2];
+
+            return kernel_mem_get(directory[fn][FTABLE_COLUMN_ADDRESS]);
+        } catch (e) {
+            throw e;
+        }
+    }
+    // Writes data to a certain memory address corresponding to a file.
+    const kernel_filesys_write = function(filename, data, process_path) {
+        try {
+            var vector = kernel_filesys_access_file(filename);
+            var directory = vector[0];
+            var directoryAddr = vector[1];
+            var fn = vector[2];
+
+            process_path = process_path || "/.kernel";
+            if (!directory[fn][FTABLE_COLUMN_LOCK]) {
+                throw FILESYS_ERROR_WRITE_LOCK;
+            }
+            if (directory[fn][FTABLE_COLUMN_LOCK] != process_path) {
+                throw FILESYS_ERROR_WRITE_LOCK;
+            }
+            kernel_mem_set(directory[fn][FTABLE_COLUMN_ADDRESS], data);
+        } catch (e) {
+            throw e;
+        }
+    }
+    // Closes file with respect to the kernel
+    const kernel_filesys_close = function(filename, process_path) {
+        try {
+            var vector = kernel_filesys_access_file(filename);
+            var directory = vector[0];
+            var directoryAddr = vector[1];
+            var fn = vector[2];
+
+            process_path = process_path || "/.kernel";
+            if (!directory[fn]) {
+                throw FILESYS_ERROR_FILE_NOT_FOUND;
+            }
+            if (directory[fn][FTABLE_COLUMN_CHILDREN]) {
+                throw FILESYS_ERROR_ISNT_FILE;
+            }
+            if (!directory[fn][FTABLE_COLUMN_LOCK]) {
+                throw FILESYS_ERROR_WRITE_LOCK;
+            }
+            if (directory[fn][FTABLE_COLUMN_LOCK] != process_path) {
+                throw FILESYS_ERROR_WRITE_LOCK;
+            }
+            // Remove lock
+            delete directory[fn][FTABLE_COLUMN_LOCK];
+            kernel_mem_set(directoryAddr, JSON.stringify(directory));
+            return FILESYS_OP_OK;
+         } catch (e) {
+             throw e;
+         }
+    }
+
     boot_state("Loading...");
 
     cli_register("shutdown", cmd_shutdown);
@@ -261,16 +404,18 @@ const VERSION_CODE = 1;
 
     boot_state("Remembering...");
 
-    init_process.then(function() {
+//    init_process.then(function() {
+    init_process();
         boot_state("Restarting tasks...");
-        init_dream_journal.then(function() {
+//        init_dream_journal.then(function() {
+    init_dream_journal();
             setTimeout(function() {
                 $('#splashscreen').style.display = 'none';
                 show_tab(0); // Show terminal
                 $('#entry').focus();
             }, 2000);
-        });
-    });
+//        });
+//    });
 })();
 
 /* Node Class */

@@ -96,20 +96,50 @@ const FILESYS_OP_OK = 0;
     var kernel_mem_request = null;
     var kernel_journal_add_entry = null;
     var kernel_journal_pop_entry = null;
+    var kernel_filesys_open = null;
+    var kernel_filesys_access_file = null;
+    var kernel_filesys_read = null;
+    var kernel_filesys_write = null;
+    var kernel_filesys_close = null;
 
     var is_filesys_init = false;
     var current_directory = "/";
-    filesys_init = function(kmg, kms, kme, kmr, ptable) {
+    filesys_init = function(kmg, kms, kme, kmr, ptable, kfo, kfaf, kfc, kfw, kfr) {
         if (!is_filesys_init) {
             kernel_mem_get = kmg;
             kernel_mem_set = kms;
             kernel_mem_exist = kme;
             kernel_mem_request = kmr;
             process_table = ptable;
+            kernel_filesys_open = kfo;
+            kernel_filesys_access_file = kfaf;
+            kernel_filesys_close = kfc;
+            kernel_filesys_write = kfw;
+            kernel_filesys_read = kfr;
+
             // Inflate file system into browser memory
             filesys_table = JSON.parse(kernel_mem_get(0));
-            if (!filesys_table[FTABLE_COLUMN_PATH]) {
+            if (!filesys_table[FTABLE_COLUMN_ADDRESS]) {
                 filesys_install();
+            }
+
+            const FILE_BITMAP = '/.bitmap';
+            if (!filesys_exists(FILE_BITMAP)) {
+                // Create bitmap
+                // When I first create the system, I NEED to give some default bitmap capacity because I need to allocate some memory before I create
+                //   the config file and I NEED to init the bitmap before I can init a filesystem based on the bitmap.
+                var bitmap = bitmap_init(1, 1024); // 1024 8-bit values
+                filesys_create(FILE_BITMAP, 777);
+                // Pass in the offset which is from the file system.
+                // If the capacity is now lower, some data will be cut-off. Some things may not work as expected.
+                kernel_filesys_open(FILE_BITMAP);
+                kernel_filesys_write(FILE_BITMAP, JSON.stringify(bitmap));
+                kernel_filesys_close(FILE_BITMAP);
+            } else {
+                // Inflate bitmap
+                kernel_filesys_open(FILE_BITMAP);
+                var bitmap = JSON.parse(filesys_read(FILE_BITMAP));
+                bitmap_init(bitmap);
             }
 
             // Check whether certain files exist. If not, create them.
@@ -118,26 +148,9 @@ const FILESYS_OP_OK = 0;
                  // Create .config
                 filesys_create(FILE_CONFIG, 777);
                 kernel_filesys_open(FILE_CONFIG);
-                var config = "{/* This file allows system parameters to be changed */}";
+                var config = '{"capacity":1024}';
                 kernel_filesys_write(FILE_CONFIG, config);
-                filesys_close(FILE_CONFIG);
-            }
-
-            const FILE_BITMAP = '/.bitmap';
-            if (!filesys_exists(FILE_BITMAP)) {
-                // Create bitmap
-                filesys_create(FILE_BITMAP, 777);
-                // Pass in the offset which is from the file system.
-                // If the capacity is now lower, some data will be cut-off. Some things may not work as expected.
-                var bitmap = bitmap_init(1, config_get_capacity()); // 1024 8-bit values
-                kernel_filesys_open(FILE_BITMAP);
-                kernel_filesys_write(FILE_BITMAP, JSON.stringify(bitmap));
-                filesys_close(FILE_BITMAP);
-            } else {
-                // Inflate bitmap
-                kernel_filesys_open(FILE_BITMAP);
-                var bitmap = JSON.parse(filesys_read(FILE_BITMAP));
-                bitmap_init(bitmap);
+                kernel_filesys_close(FILE_CONFIG);
             }
 
             const FILE_VOLATILE_MEMORY = '/.volatile';
@@ -146,7 +159,7 @@ const FILESYS_OP_OK = 0;
                 filesys_create(FILE_VOLATILE_MEMORY, 777);
                 kernel_filesys_open(FILE_VOLATILE_MEMORY);
                 kernel_filesys_write(FILE_VOLATILE_MEMORY, JSON.stringify([]));
-                filesys_close(FILE_VOLATILE_MEMORY);
+                kernel_filesys_close(FILE_VOLATILE_MEMORY);
             }
 
             const FILE_DREAM_JOURNAL = '/.dream-journal';
@@ -155,7 +168,7 @@ const FILESYS_OP_OK = 0;
                 filesys_create(FILE_DREAM_JOURNAL, 777);
                 kernel_filesys_open(FILE_DREAM_JOURNAL);
                 kernel_filesys_write(FILE_DREAM_JOURNAL, JSON.stringify([]));
-                filesys_close(FILE_DREAM_JOURNAL);
+                kernel_filesys_close(FILE_DREAM_JOURNAL);
             }
 
             // File capacity contains allocation count of filesystem, nv, and v memory
@@ -166,7 +179,7 @@ const FILESYS_OP_OK = 0;
                 kernel_filesys_open(FILE_CAPACITY);
                 // 6 is the base filesystem size.
                 kernel_filesys_write(FILE_CAPACITY, JSON.stringify([6, 0, 0]));
-                filesys_close(FILE_CAPACITY);
+                kernel_filesys_close(FILE_CAPACITY);
             }
 
             is_filesys_init = true;
@@ -182,53 +195,12 @@ const FILESYS_OP_OK = 0;
         }
     }
 
-    // Opens up a file with respect to the kernel, so locking it with a special path that doesn't resolve.
-    function kernel_filesys_open(filename, process_path) {
-        process_path = process_path || "/.kernel";
-        try {
-            var vector = filesys_access_file(filename);
-            var directory = vector[0];
-            var directoryAddr = vector[1];
-            var fn = vector[2];
-
-            if (!directory[fn][FTABLE_COLUMN_LOCK]) {
-                throw FILESYS_ERROR_WRITE_LOCK;
-            }
-            if (directory[fn][FTABLE_COLUMN_LOCK] != process_path) {
-                throw FILESYS_ERROR_WRITE_LOCK;
-            }
-            kernel_mem_set(directory[fn][FTABLE_COLUMN_ADDRESS], data);
-        } catch (e) {
-            throw e;
-        }
-    }
-
     filesys_open = function(filename) {
         // Opens a file and locks it based on the curr process.
         if (!process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]) {
             throw FILESYS_ERROR_CANNOT_LOCK;
         }
         return kernel_filesys_open(filename, process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
-    }
-
-    function kernel_filesys_write(filename, data, process_path) {
-        try {
-            var vector = filesys_access_file(filename);
-            var directory = vector[0];
-            var directoryAddr = vector[1];
-            var fn = vector[2];
-
-            process_path = process_path || "/.kernel";
-            if (!directory[fn][FTABLE_COLUMN_LOCK]) {
-                throw FILESYS_ERROR_WRITE_LOCK;
-            }
-            if (directory[fn][FTABLE_COLUMN_LOCK] != process_path) {
-                throw FILESYS_ERROR_WRITE_LOCK;
-            }
-            kernel_mem_set(directory[fn][FTABLE_COLUMN_ADDRESS], data);
-        } catch (e) {
-            throw e;
-        }
     }
 
     filesys_write = function(filename, data) {
@@ -269,56 +241,12 @@ const FILESYS_OP_OK = 0;
         return kernel_filesys_write_meta(filename, process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
     }
 
-    // Closes file with respect to the kernel
-    function kernel_filesys_close(filename, process_path) {
-        try {
-             var vector = filesys_access_file(filename);
-             var directory = vector[0];
-             var directoryAddr = vector[1];
-             var fn = vector[2];
-
-             process_path = process_path || "/.kernel";
-             if (!directory[fn]) {
-                 throw FILESYS_ERROR_FILE_NOT_FOUND;
-             }
-             if (directory[fn][FTABLE_COLUMN_CHILDREN]) {
-                 throw FILESYS_ERROR_ISNT_FILE;
-             }
-             if (!directory[fn][FTABLE_COLUMN_LOCK]) {
-                 throw FILESYS_ERROR_WRITE_LOCK;
-             }
-             if (directory[fn][FTABLE_COLUMN_LOCK] != process_path) {
-                 throw FILESYS_ERROR_WRITE_LOCK;
-             }
-             // Remove lock
-             delete directory[fn][FTABLE_COLUMN_LOCK];
-             return FILESYS_OP_OK;
-         } catch (e) {
-             throw e;
-         }
-    }
-
     filesys_close = function(filename) {
         // Opens a file and locks it based on the curr process.
         if (!process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]) {
             throw FILESYS_ERROR_CANNOT_LOCK;
         }
         return kernel_filesys_close(filename, process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
-    }
-
-    // Opens up a file with respect to the kernel, so locking it with a special path that doesn't resolve.
-    function kernel_filesys_read(filename, process_path) {
-        process_path = process_path || "/.kernel";
-        try {
-            var vector = filesys_access_file(filename);
-            var directory = vector[0];
-            var directoryAddr = vector[1];
-            var fn = vector[2];
-
-            return kernel_mem_read(directory[fn][FTABLE_COLUMN_ADDRESS]);
-        } catch (e) {
-            throw e;
-        }
     }
 
     filesys_read = function(filename) {
@@ -436,15 +364,16 @@ const FILESYS_OP_OK = 0;
 
             // TODO Update our directory children count.
             kernel_journal_add_entry("Update,-1");
+            kernel_journal_add_entry("Free," + directory[fn][FTABLE_COLUMN_ADDRESS]);
+            kernel_journal_add_entry("Delete," + directoryAddr + "," + fn);
+
             update_capacity(0, -1);
             // Pop our last entry and add another
             kernel_journal_pop_entry();
 
-            kernel_journal_add_entry("Free," + directory[fn][FTABLE_COLUMN_ADDRESS]);
             mem_free(directory[fn][FTABLE_COLUMN_ADDRESS], 1);
             kernel_journal_pop_entry();
 
-            kernel_journal_add_entry("Delete," + directoryAddr + "," + fn);
             delete directory[fn];
             kernel_journal_pop_entry();
 
@@ -463,7 +392,7 @@ const FILESYS_OP_OK = 0;
             var root = JSON.parse(kernel_mem_get(0));
             var directory = root;
             var directoryAddr = 0;
-            for (var i = 0; i < path.length - 1; i++) {
+            for (var i = 1; i < path.length - 1; i++) {
                 // Traverse file system
                 directory = root[path[i]];
                 directoryAddr = root[path[i]][FTABLE_COLUMN_ADDRESS];
@@ -486,7 +415,8 @@ const FILESYS_OP_OK = 0;
 
     filesys_create = function(filename, chmod) {
         try {
-            var vector = filesys_access_file(filename);
+            // Does the `filesys_access_file` without the errors
+            var vector = kernel_filesys_access_file(filename, false);
             var directory = vector[0];
             var directoryAddr = vector[1];
             var fn = vector[2];
@@ -508,29 +438,8 @@ const FILESYS_OP_OK = 0;
     }
 
     // Returns a vector of items related to accessing a file.
-    function filesys_access_file(path) {
-        // First, navigate to the directory
-        var path = filename.split('/');
-        // Inflate file system
-        var root = JSON.parse(kernel_mem_get(0));
-        var directory = root;
-        var directoryAddr = 0;
-        for (var i = 0; i < path.length - 1; i++) {
-            // Traverse file system
-            if (!root[path[i]]) {
-                throw FILESYS_ERROR_FILE_NOT_FOUND;
-            }
-            directory = root[path[i]];
-            directoryAddr = root[path[i]][FTABLE_COLUMN_ADDRESS];
-        }
-        if (!directory[path[path.length - 1]]) {
-            throw FILESYS_ERROR_FILE_NOT_FOUND;
-        }
-        if (directory[path[path.length - 1]][FTABLE_COLUMN_CHILDREN]) {
-            throw FILESYS_ERROR_ISNT_FILE;
-        }
-        var fn = path[path.length - 1];
-        return [directory, directoryAddr, fn];
+    function filesys_access_file(filename) {
+        return kernel_filesys_access_file(filename, true);
     }
 
     // Call this to initialize the file system.
@@ -541,11 +450,16 @@ const FILESYS_OP_OK = 0;
 
     function update_capacity(index, delta) {
         const FILENAME = '/.capacity';
+        // If file hasn't been created, then obviously we can't update the capacity.
+        if (!filesys_exists(FILENAME)) {
+            return FILESYS_ERROR_FILE_NOT_FOUND; // Returns error code, doesn't throw error.
+        }
         filesys_open(FILENAME);
         var capacity = JSON.parse(filesys_read(FILENAME));
         capacity[index] += delta;
         filesys_write(FILENAME, JSON.stringify(capacity));
         filesys_close(FILENAME);
+        return FILESYS_OP_OK;
     }
 
     // Shows details in the file explorer tab

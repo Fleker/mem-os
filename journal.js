@@ -22,10 +22,19 @@ var JOURNAL_OP_OK = 0;
     const FILE_DREAM_JOURNAL = '/.dream-journal';
     var is_journal_init = false;
     var process_table = [];
+    var kernel_filesys_open = null;
+    var kernel_filesys_read = null;
+    var kernel_filesys_write = null;
+    var kernel_filesys_close = null;
 
-    journal_init = function(ptable) {
+    journal_init = function(ptable, kfo, kfw, kfc, kfr) {
         if (!is_journal_init) {
             process_table = ptable;
+            kernel_filesys_open = kfo;
+            kernel_filesys_read = kfr;
+            kernel_filesys_write = kfw;
+            kernel_filesys_close = kfc;
+
             is_journal_init = true;
             return [kernel_journal_add_entry, kernel_journal_pop_entry];
         }
@@ -33,9 +42,9 @@ var JOURNAL_OP_OK = 0;
 
     kernel_journal_add_entry = function(entry_data, path_name) {
         // Inflate journal
-        filesys_open(FILE_DREAM_JOURNAL);
-        var dj = JSON.parse(filesys_read(FILE_DREAM_JOURNAL));
+        var dj = JSON.parse(kernel_filesys_read(FILE_DREAM_JOURNAL));
         var path = path_name || '/.kernel';
+        kernel_filesys_open(FILE_DREAM_JOURNAL, path);
         if (!path) {
             throw JOURNAL_ERROR_NO_PROCESS_PATH;
         }
@@ -47,8 +56,8 @@ var JOURNAL_OP_OK = 0;
             dj[path] = [entry_data];
         }
         // Save back to memory
-        filesys_write(FILE_DREAM_JOURNAL, JSON.stringify(dj));
-        filesys_close(FILE_DREAM_JOURNAL);
+        kernel_filesys_write(FILE_DREAM_JOURNAL, JSON.stringify(dj));
+        kernel_filesys_close(FILE_DREAM_JOURNAL);
         return JOURNAL_OP_OK;
     }
 
@@ -61,8 +70,8 @@ var JOURNAL_OP_OK = 0;
 
     kernel_journal_pop_entry = function(path_name) {
         // Inflate journal
-        filesys_open(FILE_DREAM_JOURNAL);
-        var dj = JSON.parse(filesys_read(FILE_DREAM_JOURNAL));
+        kernel_filesys_open(FILE_DREAM_JOURNAL);
+        var dj = JSON.parse(kernel_filesys_read(FILE_DREAM_JOURNAL));
         var path = path_name || '/.kernel';
         if (!path) {
             throw JOURNAL_ERROR_NO_PROCESS_PATH;
@@ -75,8 +84,8 @@ var JOURNAL_OP_OK = 0;
         }
         var result = dj[path].splice(0, 1);
         // Save back to memory
-        filesys_write(FILE_DREAM_JOURNAL, JSON.stringify(dj));
-        filesys_close(FILE_DREAM_JOURNAL);
+        kernel_filesys_write(FILE_DREAM_JOURNAL, JSON.stringify(dj));
+        kernel_filesys_close(FILE_DREAM_JOURNAL);
         return result;
     }
 
@@ -88,7 +97,7 @@ var JOURNAL_OP_OK = 0;
     }
 
     journal_count = function() {
-        var dj = JSON.parse(filesys_read(FILE_DREAM_JOURNAL));
+        var dj = JSON.parse(kernel_filesys_read(FILE_DREAM_JOURNAL));
         var path = process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH];
         if (!path) {
             throw JOURNAL_ERROR_NO_PROCESS_PATH;

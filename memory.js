@@ -32,6 +32,9 @@ const MEM_FREE_OK = 0;
     var kernel_mem_exists = null;
     var kernel_mem_get = null;
     var kernel_mem_set = null;
+    var kernel_filesys_open = null;
+    var kernel_filesys_write = null;
+    var kernel_filesys_close = null;
     var process_table = null;
     var is_mem_init = false;
     var is_bitmap_init = false;
@@ -48,13 +51,16 @@ const MEM_FREE_OK = 0;
         }
     }
 
-    mem_init = function(kme, kmg, kms, kprocess_table) {
+    mem_init = function(kme, kmg, kms, kprocess_table, kfo, kfw, kfc) {
         // Pass functions in from the kernel
         if (!is_mem_init) {
             kernel_mem_exists = kme;
             kernel_mem_get = kmg;
             kernel_mem_set = kms;
             process_table = kprocess_table;
+            kernel_filesys_open = kfo;
+            kernel_filesys_write = kfw;
+            kernel_filesys_close = kfc;
             is_mem_init = true;
 
             memory_map_ui_init();
@@ -99,10 +105,6 @@ const MEM_FREE_OK = 0;
         // Try to over-allocate memory.
         // We need to check the bitmap.
 
-        // Make sure we aren't requesting too little memory.
-        if (bytes < process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]) {
-            return MEM_ERROR_PROCESS_MEMORY_OVERLOAD;
-        }
         var requested_bytes = Math.pow(2, Math.ceil(Math.log2(bytes)));
         var mem_alloc_index = Math.floor(Math.log2(requested_bytes)) - bitmap_min;
         for (var i = mem_alloc_index; i < bitmap.length; i++) {
@@ -117,11 +119,13 @@ const MEM_FREE_OK = 0;
                         bitmap[i].prev = null;
                     }
                     update_ui();
-                    // Save change
+                    // Save change if possible. This may not be possible IF our bitmap file is being created now.
                     const FILENAME = '/.bitmap';
-                    filesys_open(FILENAME);
-                    filesys_write(FILENAME, JSON.stringify(bitmap));
-                    filesys_close(FILENAME);
+                    if (filesys_exists(FILENAME)) {
+                        kernel_filesys_open(FILENAME);
+                        kernel_filesys_write(FILENAME, JSON.stringify(bitmap));
+                        kernel_filesys_close(FILENAME);
+                    }
 
                     // Return the address in our kernel function. If we're doing something in
                     //   userspace, we should hide the raw address. We can use this address
@@ -160,6 +164,11 @@ const MEM_FREE_OK = 0;
     }
 
     mem_request = function(bytes) {
+        // Make sure we aren't requesting too little memory.
+        if (bytes < process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]) {
+            return MEM_ERROR_PROCESS_MEMORY_OVERLOAD;
+        }
+
         // This will return the address with the bytes now allocated.
         var addr = kernel_mem_request(bytes);
         // Add these values to a memory table file.
