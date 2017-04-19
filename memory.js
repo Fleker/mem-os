@@ -76,7 +76,6 @@ const MEM_FREE_OK = 0;
 
             is_mem_init = true;
 
-            memory_map_ui_init();
             update_memory_ui();
             return [kernel_mem_request, kernel_mem_free];
         }
@@ -87,6 +86,8 @@ const MEM_FREE_OK = 0;
             if (typeof offset == "object") {
                 // We can just use this bitmap instead, inflated from storage.
                 bitmap = offset;
+                memory_map_ui_init();
+                update_memory_ui();
                 return FILESYS_OP_OK;
             }
 
@@ -103,6 +104,7 @@ const MEM_FREE_OK = 0;
             // Exit once we've got memory in each location
             is_bitmap_init = true;
             update_memory_ui();
+            memory_map_ui_init();
             return bitmap;
         }
     }
@@ -248,6 +250,7 @@ const MEM_FREE_OK = 0;
             $('#tab_2').innerHTML = out;
 
             out = "<table><thead><tr><td>Address</td><td>Value</td></thead><tbody>";
+            console.log("Capacity: " + config_get_capacity());
             for (var i = 0; i < config_get_capacity(); i++) {
                 out += "<tr><td>0x" + i.toString(16) + "</td><td class='mem_cell'>" + kernel_mem_get(i) + "</td></tr>";
             }
@@ -262,10 +265,14 @@ const MEM_FREE_OK = 0;
         new Promise(function(fulfill, reject) {
             console.log("Constructing memory map");
             var canvas = $('#memory_map');
-            canvas.height = config_get_capacity() * 10;
+            if (config_get_capacity()) {
+                canvas.height = config_get_capacity() * 10;
+            } else {
+                canvas.height = 1024 * 10; // Assume
+            }
             canvas.width = 176;
             ctx = canvas.getContext('2d');
-            for (var i = 0; i < config_get_capacity(); i++) {
+            for (var i = 0; i < canvas.height / 10; i++) {
                 var val = kernel_mem_get(i);
                 for (var j = 16; j >= 0; j--) {
                     var mask = 1 << j;
