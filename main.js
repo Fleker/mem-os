@@ -260,7 +260,11 @@ const VERSION_CODE = 2;
                 // List view
                 var names = "";
                 for (i in directory) {
-                    names += i + "<br>";
+                    if (directory[i][FTABLE_COLUMN_CHILDREN]) {
+                        names += "<span class='highlight-green'>" + i + "</span><br>"
+                    } else {
+                        names += i + "<br>";
+                    }
                 }
                 return names;
             } else if (args.indexOf('-j') > -1) {
@@ -270,7 +274,11 @@ const VERSION_CODE = 2;
                 // Grid view
                 var names = "";
                 for (i in directory) {
-                    names += i + "&emsp;";
+                    if (directory[i][FTABLE_COLUMN_CHILDREN]) {
+                        names += "<span class='highlight-green'>" + i + "</span>&emsp;"
+                    } else {
+                        names += i + "&emsp;";
+                    }
                 }
                 return names;
             }
@@ -282,7 +290,9 @@ const VERSION_CODE = 2;
     const cmd_rm = function(args) {
         // Handle factory reset
         if (args[1] == "/" && args[2] == "-rf") {
-            delete localStorage;
+            for (i in localStorage) {
+                localStorage[i] = "";
+            }
             return "All data was deleted /shrug";
         }
         try {
@@ -342,6 +352,7 @@ const VERSION_CODE = 2;
             }
         } catch(e) {
             return "Error " + e;
+            console.error(e);
         }
     }
 
@@ -360,7 +371,7 @@ const VERSION_CODE = 2;
     const cmd_exec = function(args) {
         try {
             // Reads from file and executes code.
-            exec(filesys_read(args[1]));
+            eval(filesys_read(args[1]));
         } catch(e) {
             return "Error executing script: " + e;
         }
@@ -514,8 +525,8 @@ const VERSION_CODE = 2;
             if (dothrow && !directory[path[i]]) {
                 throw FILESYS_ERROR_FILE_NOT_FOUND;
             }
-            directory = directory[path[i]];
             directoryAddr = directory[path[i]][FTABLE_COLUMN_ADDRESS];
+            directory = JSON.parse(kernel_mem_get(directoryAddr));
         }
         if (dothrow && !directory[path[path.length - 1]]) {
             throw FILESYS_ERROR_FILE_NOT_FOUND;
@@ -547,8 +558,8 @@ const VERSION_CODE = 2;
             if (dothrow && !directory[path[i]]) {
                 throw FILESYS_ERROR_FILE_NOT_FOUND;
             }
-            directory = directory[path[i]];
             directoryAddr = directory[path[i]][FTABLE_COLUMN_ADDRESS];
+            directory = JSON.parse(kernel_mem_get(directoryAddr));
         }
         if (dothrow && !directory) {
             throw FILESYS_ERROR_FILE_NOT_FOUND;

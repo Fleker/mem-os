@@ -120,8 +120,13 @@ const FILESYS_OP_OK = 0;
             kernel_mem_free = kmf;
 
             // Inflate file system into browser memory
-            filesys_table = JSON.parse(kernel_mem_get(0));
-            if (!filesys_table[FTABLE_COLUMN_ADDRESS]) {
+            try {
+                filesys_table = JSON.parse(kernel_mem_get(0));
+            } catch(e) {
+                filesys_table = null;
+            }
+            if (!filesys_table) {
+                console.info("Need to install the file system");
                 filesys_install();
             }
 
@@ -140,7 +145,7 @@ const FILESYS_OP_OK = 0;
             } else {
                 // Inflate bitmap
                 kernel_filesys_open(FILE_BITMAP);
-                var bitmap = JSON.parse(filesys_read(FILE_BITMAP));
+                var bitmap = JSON.parse(kernel_filesys_read(FILE_BITMAP));
                 bitmap_init(bitmap);
             }
 

@@ -18,6 +18,10 @@ body, .terminal {
     overflow-y: scroll;
 }
 
+.highlight-green {
+    background-color: #1B5E20;
+}
+
 #entry::before {
     content: ">"
 }
