@@ -221,7 +221,9 @@ const FILESYS_OP_OK = 0;
 
     filesys_open = function(filename) {
         // Opens a file and locks it based on the curr process.
+        console.log(process_table[process_get_current()]);
         if (!process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]) {
+            console.warn(process_table[process_get_current()]);
             throw FILESYS_ERROR_CANNOT_LOCK;
         }
         return kernel_filesys_open(filename, process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
@@ -274,7 +276,13 @@ const FILESYS_OP_OK = 0;
     }
 
     filesys_read = function(filename) {
-        return kernel_filesys_read(filename, process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
+        console.log( process_table[process_get_current()]);
+        if (process_table[process_get_current()]) {
+            return kernel_filesys_read(filename, process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
+        } else {
+            // TODO Probably shouldn't allow this to run.
+            return kernel_filesys_read(filename);
+        }
     }
 
     filesys_read_meta = function(filename) {

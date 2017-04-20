@@ -372,7 +372,9 @@ const VERSION_CODE = 2;
         try {
             // Reads from file and executes code.
             // Reclaim nv memory
+            console.log("P" + process_get_current());
             process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH] = args[1];
+            console.log(process_table[process_get_current()]);
             if (filesys_exists(args[1] + ".data")) {
                 var nvdata = filesys_read(args[1] + ".data").split(",");
                 process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER] = parseInt(nvdata[0]);
@@ -473,6 +475,9 @@ const VERSION_CODE = 2;
     }
 
     const kernel_mem_free = function(addr, len) {
+        if (!addr || !len) {
+            return MEM_ERROR_KERNEL_BOUNDS;
+        }
         // Be conservative with how many bytes are being freed.
         var requested_bytes = Math.pow(2, Math.floor(Math.log2(len)));
         var mem_alloc_index = Math.floor(Math.log2(requested_bytes)) - bitmap_min;
