@@ -108,3 +108,5 @@ The dream journal is a global ledger for processes to resume actions that did no
 ### Known Issues
 * Memory / storage isn't actually that secure due to `localStorage` limitations.
 * One memory cell can technically store a virtually unlimited amount of data.
+
+# Changelog

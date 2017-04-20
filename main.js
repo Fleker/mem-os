@@ -1,13 +1,53 @@
 // Kernel
 
+// Updates the boot text (although not really)
 function boot_state(txt) {
     console.log(txt);
     $('#boot_status').innerHTML = txt;
 }
 
+// Blocks for some number of milliseconds
 function delay(ms) {
     var time = new Date().getTime();
     while (new Date().getTime() - time < ms) {}
+}
+
+var resource_monitor_energy = 0;
+var resource_monitor_read = 0;
+var resource_monitor_write = 0;
+// TODO Record all reads/writes
+var resource_monitor_cnt_read = 0;
+var resource_monitor_cnt_write = 0;
+var physical_size = 0;
+var uptime = new Date();
+// UI-related function which tracks time it takes to do certain actions
+function update_resource_monitor(thing) {
+    if (thing == 'read' && config_get_read_ns()) {
+        resource_monitor_read += config_get_read_ns();
+    } else if (thing == 'write' && config_get_write_ns()) {
+        resource_monitor_write += config_get_write_ns();
+    } else if (thing == 'energy' && config_get_energy()) {
+        resource_monitor_energy += config_get_energy();
+    }
+    physical_size = config_get_capacity() * config_get_density();
+
+    var time = new Date();
+    var timeStr = time.getHours() + ":" + ((time.getMinutes() < 10) ? "0" : "") + time.getMinutes();
+    var up = time - uptime;
+    var upH = Math.floor(up / (1000 * 60 * 60))
+    up -= upH * (1000 * 60 * 60);
+    var upM = Math.floor(up / (1000 * 60));
+    up -= upM * (1000 * 60);
+    var upS = Math.floor(up/1000);
+    up -= upS * 1000;
+    var upStr = upH + ":" + ((upM < 10) ? "0" : "") + upM + ":" + ((upS < 10) ? "0" : "") + upS + "." + up;
+    $('#tab_5').innerHTML = "<strong>The time is " + timeStr + "</strong><br>";
+    $('#tab_5').innerHTML += "&emsp;System Uptime: " + upStr;
+    $('#tab_5').innerHTML += "<br><br><br>Energy Usage: " + resource_monitor_energy + "pJ";
+    $('#tab_5').innerHTML += "<br><br><br>Time Spent: <br>";
+    $('#tab_5').innerHTML += "&emsp;Read Time: " + resource_monitor_read + "ns<br>&emsp;Write Time: " + resource_monitor_write + "ns";
+    $('#tab_5').innerHTML += "<br><br><br>System Config:<br>";
+    $('#tab_5').innerHTML += "&emsp;Physical Size: " + physical_size + "F<sup>2</sup><br>&emsp;Processor: " + config_get_clock() + " GHz<br>&emsp;Capacity: " + config_get_capacity() + " Bytes";
 }
 
 // Gets the hardware read duration in nanoseconds.
@@ -20,11 +60,13 @@ var config_get_energy = null;
 var config_get_capacity = null;
 // Gets the hardware clock frequency in GHz.
 var config_get_clock = null;
+// Gets the physical hardware density in F^2.
+var config_get_density = null;
 
 // Label for the OS version
-const VERSION_NAME = "0.1.0";
+const VERSION_NAME = "1.0.0";
 // Numerical build number for OS version
-const VERSION_CODE = 2;
+const VERSION_CODE = 3;
 
 (function() {
     var process_table = [];
@@ -78,23 +120,12 @@ const VERSION_CODE = 2;
 
         // Inflate `/.config` and set system configuration parameters
         var configuration = JSON.parse(kernel_filesys_read('/.config'));
-        if (configuration['read_ns']) {
-            config['read_ns'] = configuration['read_ns'] || 1;
-        }
-        if (configuration['write_ns']) {
-            config['write_ns'] = configuration['write_ns'] || 1;
-        }
-        if (configuration['energy']) {
-            config['energy'] = configuration['energy'] || 1;
-        }
-        if (configuration['capacity']) {
-            config['capacity'] = configuration['capacity'] || 1;
-        }
-        if (configuration['clock']) {
-            config['clock'] = configuration['clock'] || 3;
-        }
-//        fulfill();
-//    });
+        config['read_ns'] = configuration['read_ns'] || 1;
+        config['write_ns'] = configuration['write_ns'] || 1;
+        config['energy'] = configuration['energy'] || 1;
+        config['capacity'] = configuration['capacity'] || 1;
+        config['clock'] = configuration['clock'] || 3;
+        config['density'] = configuration['density'] || 4;
     }
 
 //    const init_dream_journal = new Promise(function(fulfill, reject) {
@@ -158,6 +189,10 @@ const VERSION_CODE = 2;
 
     config_get_clock = function() {
         return config['clock'];
+    }
+
+    config_get_density = function() {
+        return config['density'];
     }
 
     const cmd_shutdown = function(args) {
@@ -418,12 +453,17 @@ const VERSION_CODE = 2;
         if (addr < 0 || addr >= config_get_capacity()) {
             throw MEM_ERROR_KERNEL_BOUNDS;
         }
-        return mem_get(addr) != undefined;
+        return kernel_mem_get(addr) != undefined;
     }
 
     const kernel_mem_get = function(addr) {
         if (addr < 0 || addr >= config_get_capacity()) {
             throw MEM_ERROR_KERNEL_BOUNDS;
+        }
+        update_resource_monitor('read');
+        update_resource_monitor('energy');
+        if (config_get_read_ns()) { // FIXME Is this the write amount of time?
+            delay(config_get_read_ns() / config_get_clock());
         }
         return localStorage['memos_memory_' + addr];
     }
@@ -431,6 +471,12 @@ const VERSION_CODE = 2;
     const kernel_mem_set = function(addr, val) {
         if (addr < 0 || addr >= config_get_capacity()) {
             throw MEM_ERROR_KERNEL_BOUNDS;
+        }
+        update_resource_monitor('write');
+        update_resource_monitor('energy');
+        if (config_get_write_ns()) {
+            // FIXME Is this the write amount of time?
+            delay(config_get_write_ns() / config_get_clock());
         }
         localStorage['memos_memory_' + addr] = val;
     }
