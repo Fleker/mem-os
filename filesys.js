@@ -90,6 +90,8 @@ const FILESYS_OP_OK = 0;
 (function() {
     var filesys_table = {};
     var process_table = [];
+    var kernel_process_get = null;
+    var kernel_process_update = null;
     var kernel_mem_get = null;
     var kernel_mem_set = null;
     var kernel_mem_exist = null;
@@ -105,8 +107,10 @@ const FILESYS_OP_OK = 0;
 
     var is_filesys_init = false;
     var current_directory = "/";
-    filesys_init = function(kmg, kms, kme, kmr, ptable, kfo, kfaf, kfc, kfw, kfr, kmf) {
+    filesys_init = function(kmg, kms, kme, kmr, ptable, kfo, kfaf, kfc, kfw, kfr, kmf, kpg, kpu) {
         if (!is_filesys_init) {
+            kernel_process_get = kpg;
+            kernel_process_update = kpu;
             kernel_mem_get = kmg;
             kernel_mem_set = kms;
             kernel_mem_exist = kme;
@@ -221,20 +225,20 @@ const FILESYS_OP_OK = 0;
 
     filesys_open = function(filename) {
         // Opens a file and locks it based on the curr process.
-        console.log(process_table[process_get_current()]);
-        if (!process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]) {
-            console.warn(process_table[process_get_current()]);
+        console.log(kernel_process_get()[process_get_current()]);
+        if (!kernel_process_get()[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]) {
+            console.warn(kernel_process_get()[process_get_current()]);
             throw FILESYS_ERROR_CANNOT_LOCK;
         }
-        return kernel_filesys_open(filename, process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
+        return kernel_filesys_open(filename, kernel_process_get()[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
     }
 
     filesys_write = function(filename, data) {
         // Opens a file and locks it based on the curr process.
-        if (!process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]) {
+        if (!kernel_process_get()[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]) {
             throw FILESYS_ERROR_CANNOT_LOCK;
         }
-        return kernel_filesys_write(filename, process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
+        return kernel_filesys_write(filename, data, kernel_process_get()[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
     }
 
     function kernel_filesys_write_meta(filename, data, process_path) {
@@ -261,27 +265,27 @@ const FILESYS_OP_OK = 0;
 
     filesys_write_meta = function(filename, data) {
         // Opens a file and locks it based on the curr process.
-        if (!process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]) {
+        if (!kernel_process_get()[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]) {
             throw FILESYS_ERROR_CANNOT_LOCK;
         }
-        return kernel_filesys_write_meta(filename, process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
+        return kernel_filesys_write_meta(filename, kernel_process_get()[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
     }
 
     filesys_close = function(filename) {
         // Opens a file and locks it based on the curr process.
-        if (!process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]) {
+        if (!kernel_process_get()[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]) {
             throw FILESYS_ERROR_CANNOT_LOCK;
         }
-        return kernel_filesys_close(filename, process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
+        return kernel_filesys_close(filename, kernel_process_get()[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
     }
 
     filesys_read = function(filename) {
-        console.log( process_table[process_get_current()]);
-        if (process_table[process_get_current()]) {
-            return kernel_filesys_read(filename, process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
+        console.log(kernel_process_get(), process_get_current(), kernel_process_get()[process_get_current()], filename);
+        if (kernel_process_get()[process_get_current()]) {
+            return kernel_filesys_read(filename, kernel_process_get()[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH]);
         } else {
             // TODO Probably shouldn't allow this to run.
-            return kernel_filesys_read(filename);
+            return kernel_filesys_read(filename, "/.terminal");
         }
     }
 
@@ -504,24 +508,25 @@ const FILESYS_OP_OK = 0;
         // Request memory
         var addr = kernel_mem_request(bytes);
         // Get process name
-        var path = process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH];
+        var path = kernel_process_get()[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH];
         // Open our `.data` file for the process and save these two parameters to recall later.
         const FILENAME = path + '.data';
         if (!filesys_exists(FILENAME)) {
             filesys_create(FILENAME, 777);
         }
         // FIXME Try to increase memory allocation in-place if possible
-        if (process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER]) {
-            mem_cpy(process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], addr, process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]);
+        if (kernel_process_get()[process_get_current()][PTABLE_COLUMN_BASE_REGISTER]) {
+            mem_cpy(kernel_process_get()[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], addr, kernel_process_get()[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]);
         }
         try {
             var vector = filesys_access_file(FILENAME);
             var directory = vector[0];
             var directoryAddr = vector[1];
             var fn = vector[2];
-
-            process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER] = addr;
-            process_table[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER] = bytes;
+            var pt = kernel_process_get();
+            pt[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER] = addr;
+            pt[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER] = bytes;
+            kernel_process_update(pt);
             kernel_filesys_open(FILENAME);
             kernel_filesys_write(FILENAME, addr + ',' + bytes);
             kernel_filesys_close(FILENAME);
@@ -532,11 +537,11 @@ const FILESYS_OP_OK = 0;
     }
 
     nvmem_read = function(addr) {
-        if (addr > process_table[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER]) {
+        if (addr > kernel_process_get()[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER]) {
             throw MEM_ERROR_BOUNDS;
         }
         // Translate to kernel address
-        var kaddr = process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER] + addr;
+        var kaddr = kernel_process_get()[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER] + addr;
         memory_map_ui('toread', kaddr);
 
         var result = kernel_mem_get(kaddr);
@@ -545,15 +550,15 @@ const FILESYS_OP_OK = 0;
     }
 
     nvmem_read_parent = function(addr) {
-        var parent_pid = process_table[process_get_current()][PTABLE_COLUMN_PARENT];
+        var parent_pid = kernel_process_get()[process_get_current()][PTABLE_COLUMN_PARENT];
         if (!parent_pid) {
             throw MEM_ERROR_ORPHAN;
         }
-        if (addr > process_table[parent_pid][PTABLE_COLUMN_LIMIT_NVREGISTER]) {
+        if (addr > kernel_process_get()[parent_pid][PTABLE_COLUMN_LIMIT_NVREGISTER]) {
             throw MEM_ERROR_BOUNDS;
         }
         // Translate to kernel address
-        var kaddr = process_table[parent_pid][PTABLE_COLUMN_BASE_NVREGISTER] + addr;
+        var kaddr = kernel_process_get()[parent_pid][PTABLE_COLUMN_BASE_NVREGISTER] + addr;
         memory_map_ui('toread', kaddr);
 
         var result = kernel_mem_get(kaddr);
@@ -562,11 +567,11 @@ const FILESYS_OP_OK = 0;
     }
 
     nvmem_set = function(addr, val) {
-        if (addr > process_table[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER]) {
+        if (addr > kernel_process_get()[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER]) {
             throw MEM_ERROR_BOUNDS;
         }
         // Translate to kernel address
-        var kaddr = process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER] + addr;
+        var kaddr = kernel_process_get()[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER] + addr;
         memory_map_ui('towrite', kaddr);
         kernel_mem_set(kaddr, val);
 
@@ -576,15 +581,15 @@ const FILESYS_OP_OK = 0;
     }
 
     nvmem_set_parent = function(addr, val) {
-        var parent_pid = process_table[process_get_current()][PTABLE_COLUMN_PARENT];
+        var parent_pid = kernel_process_get()[process_get_current()][PTABLE_COLUMN_PARENT];
         if (!parent_pid) {
             throw MEM_ERROR_ORPHAN;
         }
-        if (addr > process_table[parent_pid][PTABLE_COLUMN_LIMIT_NVREGISTER]) {
+        if (addr > kernel_process_get()[parent_pid][PTABLE_COLUMN_LIMIT_NVREGISTER]) {
             throw MEM_ERROR_BOUNDS;
         }
         // Translate to kernel address
-        var kaddr = process_table[parent_pid][PTABLE_COLUMN_BASE_NVREGISTER] + addr;
+        var kaddr = kernel_process_get()[parent_pid][PTABLE_COLUMN_BASE_NVREGISTER] + addr;
         memory_map_ui('towrite', kaddr);
         kernel_mem_set(kaddr, val);
 
@@ -594,23 +599,25 @@ const FILESYS_OP_OK = 0;
     }
 
     nvmem_free = function(addr, len) {
-         var prevLength = process_table[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER];
+         var prevLength = kernel_process_get()[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER];
         // Reallocate memory in process table
         if (addr < 0 || addr + len > prevLength) {
             throw MEM_ERROR_BOUNDS;
         }
         // We need to make sure a proper chunk of memory is freed to avoid splitting process memory.
+        var pt = kernel_process_get();
         if (addr == 0) {
             // Crop length
-            process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER] = len;
+            pt[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER] = len;
         } else {
-            process_table[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER] = addr;
+            pt[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER] = addr;
         }
+        kernel_process_update(pt);
 
         // Update capacity
         update_capacity(1, -len);
-        addr = process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER];
-        len  = process_table[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER];
+        addr = kernel_process_get()[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER];
+        len  = kernel_process_get()[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER];
         // Be conservative with how many bytes are being freed.
         var requested_bytes = Math.pow(2, Math.floor(Math.log2(len)));
         var mem_alloc_index = Math.floor(Math.log2(requested_bytes)) - bitmap_min;

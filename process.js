@@ -51,13 +51,14 @@ const PTABLE_COLUMN_PROCESS_ARGS = "args";
 (function() {
     // TODO Reclaim nv memory
     var is_process_init = false;
-
-    var process_table = undefined;
     var current_process = undefined;
+    var kernel_process_get = null;
+    var kernel_process_update = null;
 
-    process_init = function(table) {
+    process_init = function(kpg, kpu) {
         if (!is_process_init) {
-            process_table = table;
+            kernel_process_get = kpg;
+            kernel_process_update = kpu;
             is_process_init = true; // Only allows process init to occur first time
         }
     }
@@ -75,12 +76,14 @@ const PTABLE_COLUMN_PROCESS_ARGS = "args";
             p[PTABLE_COLUMN_PROCESS_ARGS] = params;
         }
         // Move over path if that was defined in current process
-        if (process_table[current_process] && process_table[current_process][PTABLE_COLUMN_APPLICATION_PATH]) {
-            p[PTABLE_COLUMN_APPLICATION_PATH] = process_table[current_process][PTABLE_COLUMN_APPLICATION_PATH];
-            p[PTABLE_COLUMN_BASE_NVREGISTER] = process_table[current_process][PTABLE_COLUMN_BASE_NVREGISTER];
-            p[PTABLE_COLUMN_LIMIT_NVREGISTER] = process_table[current_process][PTABLE_COLUMN_LIMIT_NVREGISTER];
+        if (kernel_process_get()[current_process] && kernel_process_get()[current_process][PTABLE_COLUMN_APPLICATION_PATH]) {
+            p[PTABLE_COLUMN_APPLICATION_PATH] = kernel_process_get()[current_process][PTABLE_COLUMN_APPLICATION_PATH];
+            p[PTABLE_COLUMN_BASE_NVREGISTER] = kernel_process_get()[current_process][PTABLE_COLUMN_BASE_NVREGISTER];
+            p[PTABLE_COLUMN_LIMIT_NVREGISTER] = kernel_process_get()[current_process][PTABLE_COLUMN_LIMIT_NVREGISTER];
         }
-        process_table[p[PTABLE_COLUMN_PID]] = p;
+        var pt = kernel_process_get();
+        pt[p[PTABLE_COLUMN_PID]] = p;
+        kernel_process_update(pt);
 
         update_ui();
     }
@@ -97,9 +100,11 @@ const PTABLE_COLUMN_PROCESS_ARGS = "args";
         if (params) {
             p[PTABLE_COLUMN_PROCESS_ARGS] = params;
         }
-        process_table[p[PTABLE_COLUMN_PID]] = p;
+        var pt = kernel_process_get();
+        pt[p[PTABLE_COLUMN_PID]] = p;
         // Set the parent id
-        process_table[p[PTABLE_COLUMN_PARENT]] = process_get_current();
+        pt[p[PTABLE_COLUMN_PARENT]] = process_get_current();
+        kernel_process_update(pt);
 
         update_ui();
     }
@@ -121,14 +126,15 @@ const PTABLE_COLUMN_PROCESS_ARGS = "args";
             // Cannot end system task
             return;
         }
-        if (!process_table[pid]) {
+        if (!kernel_process_get()[pid]) {
             return;
         }
         // Automatic memory cleanup
-        mem_free(process_table[pid][PTABLE_COLUMN_BASE_REGISTER], process_table[pid][PTABLE_COLUMN_LIMIT_REGISTER]);
+        mem_free(kernel_process_get()[pid][PTABLE_COLUMN_BASE_REGISTER], kernel_process_get()[pid][PTABLE_COLUMN_LIMIT_REGISTER]);
         // By removing it from the process table we will not call it anymore
-        delete process_table[pid];
-
+        var pt = kernel_process_get();
+        delete pt[pid];
+        kernel_process_update(pt);
         update_ui();
     }
 
@@ -143,11 +149,11 @@ const PTABLE_COLUMN_PROCESS_ARGS = "args";
 
     function process_generate_id() {
         var pid = -1;
-        if (process_table.length == 0) {
+        if (kernel_process_get().length == 0) {
             // Put in system idle task id
             return 0;
         }
-        while (pid == -1 || process_table[pid] != undefined) {
+        while (pid == -1 || kernel_process_get()[pid] != undefined) {
             pid = Math.round((Math.random() * PROCESS_MAX));
             console.log(pid);
         }
@@ -157,8 +163,8 @@ const PTABLE_COLUMN_PROCESS_ARGS = "args";
     function update_ui() {
         // Update PROCESS tab
         var out = "<table><thead><tr><td>PID</td><td>Name</td><td>State</td><td>Base Register</td><td>Limit Register</td><td>NV Base Register</td><td>NV Limit Register</td><td>Time Created</td><td>Parent PID</td><td>Path</td></tr></thead><tbody>";
-        for (i in process_table) {
-            var p = process_table[i];
+        for (i in kernel_process_get()) {
+            var p = kernel_process_get()[i];
             out += "<tr><td>" + p[PTABLE_COLUMN_PID] + "</td><td>" + p[PTABLE_COLUMN_NAME] + "</td><td>" + p[PTABLE_COLUMN_STATE] + "</td><td>" + p[PTABLE_COLUMN_BASE_REGISTER] + "</td><td>" + p[PTABLE_COLUMN_LIMIT_REGISTER] + "</td><td>" + p[PTABLE_COLUMN_BASE_NVREGISTER] + "</td><td>" + p[PTABLE_COLUMN_LIMIT_NVREGISTER] + "</td><td>" + p[PTABLE_COLUMN_TIME_EXEC] + "</td><td>" + p[PTABLE_COLUMN_PARENT] + "</td><td>" + p[PTABLE_COLUMN_APPLICATION_PATH] + "</td></tr>";
         }
         out += "</tbody></table>";

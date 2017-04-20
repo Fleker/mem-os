@@ -24,6 +24,11 @@ function cli_process(cmd) {
     process_remove_self();
 }
 
+function cli_exec(cmd) {
+    var args = cmd.split(' ');
+    cli_history_append(cli_parse(cmd, args));
+}
+
 function cli_parse(cmd, args) {
     if (args[0] == "hello") {
         return 'Hello.';

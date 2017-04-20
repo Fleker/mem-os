@@ -37,7 +37,7 @@ const VERSION_CODE = 2;
     const init_process = function() {
         // Schedule idle task
         // As JS passes by reference, we can create the ptable here and pass it into the process manager
-        process_init(process_table);
+        process_init(kernel_process_get, kernel_process_update);
         function task_scheduler() {
             // Iterate through every process and execute it.
             // Simple round robin implementation. No priority.
@@ -60,7 +60,7 @@ const VERSION_CODE = 2;
         var mem_vector = mem_init(kernel_mem_exists, kernel_mem_get, kernel_mem_set, process_table, kernel_filesys_open, kernel_filesys_write, kernel_filesys_close, kernel_filesys_read, kernel_mem_free, kernel_mem_request, bitmap_min, bitmap, update_volatile_capacity);
 
         // Init file system
-        filesys_init(kernel_mem_get, kernel_mem_set, kernel_mem_exists, kernel_mem_request, process_table, kernel_filesys_open, kernel_filesys_access_file, kernel_filesys_close, kernel_filesys_write, kernel_filesys_read, kernel_mem_free);
+        filesys_init(kernel_mem_get, kernel_mem_set, kernel_mem_exists, kernel_mem_request, process_table, kernel_filesys_open, kernel_filesys_access_file, kernel_filesys_close, kernel_filesys_write, kernel_filesys_read, kernel_mem_free, kernel_process_get, kernel_process_update );
 
         // Free volatile memory
         var volatile_memory = JSON.parse(kernel_filesys_read('/.volatile'));
@@ -380,7 +380,11 @@ const VERSION_CODE = 2;
                 process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER] = parseInt(nvdata[0]);
                 process_table[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER] = parseInt(nvdata[1]);
             }
-            eval(filesys_read(args[1]));
+            var fnc = '(function() { ' + filesys_read(args[1]) + '})';
+            var script = eval(fnc);
+            console.log(process_table[process_get_current()]);
+            script();
+            console.log(process_table[process_get_current()]);
             return "";
         } catch(e) {
             return "Error executing script: " + e;
@@ -390,7 +394,18 @@ const VERSION_CODE = 2;
     /*
      * Here are all of our Kernel Functions. These are passed into other components for sandbox purposes.
      *
-     * Our Kernel Memory Functions
+     * Our Kernel Process Functions
+     */
+    const kernel_process_get = function() {
+        return process_table;
+    }
+
+    const kernel_process_update = function(ptable) {
+        process_table = ptable;
+    }
+
+    /*
+     * Kernel Memory Functions
      */
     // Lowest possible block of memory is 1 byte(s)
     const bitmap_min = 0; // 2 ^ _0_ = 1

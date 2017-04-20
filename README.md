@@ -70,7 +70,7 @@ Processes can be created, and the terminal itself creates a process on every com
 ### Terminal
 * `cli_register(keyword, function)`
 * `cli_history_append(text)`
-* `cli_process(terminal_cmd)`
+* `cli_exec(terminal_cmd)`
 
 ### File System
 Files are basically what you'd expect. Each one exists in a tree-hierarchy similar to UNIX-based operating systems. In order to write to a file, one must first `open` it, placing a *lock* on the file until the file receives a `close`. While a file is locked, no other processes can open or write to it. However, every process is able to read from any file. 
