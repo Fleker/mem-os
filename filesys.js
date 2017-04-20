@@ -97,6 +97,7 @@ const FILESYS_OP_OK = 0;
     var kernel_mem_exist = null;
     var kernel_mem_request = null;
     var kernel_mem_free = null;
+    var kernel_mem_cpy = null;
     var kernel_journal_add_entry = null;
     var kernel_journal_pop_entry = null;
     var kernel_filesys_open = null;
@@ -107,7 +108,7 @@ const FILESYS_OP_OK = 0;
 
     var is_filesys_init = false;
     var current_directory = "/";
-    filesys_init = function(kmg, kms, kme, kmr, ptable, kfo, kfaf, kfc, kfw, kfr, kmf, kpg, kpu) {
+    filesys_init = function(kmg, kms, kme, kmr, ptable, kfo, kfaf, kfc, kfw, kfr, kmf, kpg, kpu, kmc) {
         if (!is_filesys_init) {
             kernel_process_get = kpg;
             kernel_process_update = kpu;
@@ -122,6 +123,7 @@ const FILESYS_OP_OK = 0;
             kernel_filesys_write = kfw;
             kernel_filesys_read = kfr;
             kernel_mem_free = kmf;
+            kernel_mem_cpy = kmc;
 
             // Inflate file system into browser memory
             try {
@@ -516,7 +518,7 @@ const FILESYS_OP_OK = 0;
         }
         // FIXME Try to increase memory allocation in-place if possible
         if (kernel_process_get()[process_get_current()][PTABLE_COLUMN_BASE_REGISTER]) {
-            mem_cpy(kernel_process_get()[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], addr, kernel_process_get()[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]);
+            kernel_mem_cpy(kernel_process_get()[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], addr, kernel_process_get()[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]);
         }
         try {
             var vector = filesys_access_file(FILENAME);
@@ -537,6 +539,9 @@ const FILESYS_OP_OK = 0;
     }
 
     nvmem_read = function(addr) {
+        if (!process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER]) {
+            throw MEM_ERROR_BOUNDS;
+        }
         if (addr > kernel_process_get()[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER]) {
             throw MEM_ERROR_BOUNDS;
         }

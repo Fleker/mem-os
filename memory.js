@@ -14,6 +14,8 @@ var mem_set_parent = null;
 var mem_free = null;
 // Updates display - for UI purposes
 var update_memory_ui = null;
+// Updates display - for UI purposes
+var memory_map_ui = null;
 
 // Memory address issue found in the kernel.
 const MEM_ERROR_KERNEL_BOUNDS = -5;
@@ -36,28 +38,19 @@ const MEM_FREE_OK = 0;
     var kernel_mem_set = null;
     var kernel_mem_request = null;
     var kernel_mem_free = null;
+    var kernel_mem_cpy = null;
     var kernel_filesys_open = null;
     var kernel_filesys_read = null;
     var kernel_filesys_write = null;
     var kernel_filesys_close = null;
+    var kernel_bitmap_get = null;
+    var kernel_bitmap_update = null;
     var update_capacity = null;
     var process_table = null;
     var is_mem_init = false;
     var is_bitmap_init = false;
-    var bitmap_min = null;
-    var bitmap = [];
 
-    /*
-     * Copies `len` bytes of data from `addr1` to `addr2`. Overwrites.
-     */
-    function mem_cpy(addr1, addr2, len) {
-        for (var i = 0; i < len; i++) {
-            // Do direct kernel memory copying.
-            kernel_mem_set(addr2 + i, kernel_mem_get(addr1 + i));
-        }
-    }
-
-    mem_init = function(kme, kmg, kms, kprocess_table, kfo, kfw, kfc, kfr, kmf, kmr, bm, bit, uvc) {
+    mem_init = function(kme, kmg, kms, kprocess_table, kfo, kfw, kfc, kfr, kmf, kmr, bm, bit, uvc, kbg, kbu, kmc) {
         // Pass functions in from the kernel
         if (!is_mem_init) {
             kernel_mem_exists = kme;
@@ -70,8 +63,10 @@ const MEM_FREE_OK = 0;
             kernel_filesys_read = kfr;
             kernel_filesys_write = kfw;
             kernel_filesys_close = kfc;
-            bitmap_min = bm;
-            bitmap = bit;
+            kernel_bitmap_get = kbg;
+            kernel_bitmap_update = kbu;
+            kernel_mem_cpy = kmc;
+//            bitmap_min = bm;
             update_capacity = uvc;
 
             is_mem_init = true;
@@ -105,14 +100,16 @@ const MEM_FREE_OK = 0;
 
     bitmap_init = function(offset, length) {
         if (!is_bitmap_init) {
+            is_bitmap_init = true;
             if (typeof offset == "object") {
                 // We can just use this bitmap instead, inflated from storage.
-                bitmap = inflate_bitmap(offset);
+                kernel_bitmap_update(inflate_bitmap(offset));
                 memory_map_ui_init();
                 update_memory_ui();
-                return FILESYS_OP_OK;
+                return bitmap;
             }
 
+            var bitmap = [];
             var start = Math.log2(length); // We start from here.
             var mem_remaining = length;
             while (mem_remaining > bitmap_min) {
@@ -123,8 +120,8 @@ const MEM_FREE_OK = 0;
                 bitmap[mem_alloc_index] = new Node(mem_addr);
                 mem_remaining -= mem_alloc;
             }
+            kernel_bitmap_update(bitmap);
             // Exit once we've got memory in each location
-            is_bitmap_init = true;
             update_memory_ui();
             memory_map_ui_init();
             return bitmap;
@@ -136,9 +133,9 @@ const MEM_FREE_OK = 0;
         if (bytes < process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]) {
             return MEM_ERROR_PROCESS_MEMORY_OVERLOAD;
         }
-
+        var requested_bytes = Math.pow(2, Math.ceil(Math.log2(bytes)));
         // This will return the address with the bytes now allocated.
-        var addr = kernel_mem_request(bytes);
+        var addr = kernel_mem_request(requested_bytes);
         // Add these values to a memory table file.
         const FILENAME = '/.volatile';
         filesys_open(FILENAME);
@@ -154,19 +151,20 @@ const MEM_FREE_OK = 0;
         // FIXME Try to increase memory allocation in-place if possible
 
         if (process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER]) {
-            mem_cpy(process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], addr, process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]);
+            kernel_mem_cpy(process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER], addr, process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]);
         }
 
         process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER] = addr;
         process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER] = requested_bytes;
         // Return amount of bytes allocated
-        return bytes;
+        return requested_bytes;
     }
 
     mem_free = function(addr, len) {
         var prevLength = process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER];
         // Reallocate memory in process table
         if (addr < 0 || addr + len > prevLength) {
+            console.error("Memory out of bounds: ", addr, len, prevLength);
             throw MEM_ERROR_BOUNDS;
         }
         // We need to make sure a proper chunk of memory is freed to avoid splitting process memory.
@@ -189,6 +187,9 @@ const MEM_FREE_OK = 0;
     }
 
     mem_read = function(addr) {
+        if (!process_table[process_get_current()][PTABLE_COLUMN_BASE_REGISTER]) {
+            throw MEM_ERROR_BOUNDS;
+        }
         if (addr > process_table[process_get_current()][PTABLE_COLUMN_LIMIT_REGISTER]) {
             throw MEM_ERROR_BOUNDS;
         }
@@ -228,7 +229,7 @@ const MEM_FREE_OK = 0;
         memory_map_ui('towrite', kaddr);
         kernel_mem_set(kaddr, val);
 
-        update_ui();
+        update_memory_ui();
         memory_map_ui('didwrite', kaddr);
         return MEM_WRITE_OK;
     }
@@ -246,7 +247,7 @@ const MEM_FREE_OK = 0;
         memory_map_ui('towrite', kaddr);
         kernel_mem_set(kaddr, val);
 
-        update_ui();
+        update_memory_ui();
         memory_map_ui('didwrite', kaddr);
         return MEM_WRITE_OK;
     }
@@ -256,10 +257,10 @@ const MEM_FREE_OK = 0;
         // For entire capacity
         new Promise(function(fulfill, reject) {
             var out = "<table><thead><tr><td>Bytes</td><td>Starting Address</td></thead><tbody>";
-            for (var i = 0; i < bitmap.length; i++) {
-                var v = (bitmap[i]) ? bitmap[i].value : "Undefined";
-                out += "<tr><td>" + Math.pow(2, i + bitmap_min) + "</td><td>" + v;
-                var node = bitmap[i];
+            for (var i = 0; i < kernel_bitmap_get().length; i++) {
+                var v = (kernel_bitmap_get()[i]) ? kernel_bitmap_get()[i].value : "Undefined";
+                out += "<tr><td>" + Math.pow(2, i + 0) + "</td><td>" + v;
+                var node = kernel_bitmap_get()[i];
                 while (node) {
                     if (node.next) {
                         out += "->" + node.next.value;
@@ -272,7 +273,6 @@ const MEM_FREE_OK = 0;
             $('#tab_2').innerHTML = out;
 
             out = "<table><thead><tr><td>Address</td><td>Value</td></thead><tbody>";
-            console.log("Capacity: " + config_get_capacity());
             for (var i = 0; i < config_get_capacity(); i++) {
                 out += "<tr><td>0x" + i.toString(16) + "</td><td class='mem_cell'>" + kernel_mem_get(i) + "</td></tr>";
             }
@@ -306,7 +306,7 @@ const MEM_FREE_OK = 0;
         }).then();
     }
 
-    function memory_map_ui(action, i) {
+    memory_map_ui = function(action, i) {
         var canvas = $('#memory_map');
         ctx = canvas.getContext('2d');
         if (action == 'toread') {

@@ -57,10 +57,10 @@ const VERSION_CODE = 2;
         process_create("System Idle Process", idle);
         setTimeout(task_scheduler, PROCESS_TIMING_QUANTUM);
 
-        var mem_vector = mem_init(kernel_mem_exists, kernel_mem_get, kernel_mem_set, process_table, kernel_filesys_open, kernel_filesys_write, kernel_filesys_close, kernel_filesys_read, kernel_mem_free, kernel_mem_request, bitmap_min, bitmap, update_volatile_capacity);
+        var mem_vector = mem_init(kernel_mem_exists, kernel_mem_get, kernel_mem_set, process_table, kernel_filesys_open, kernel_filesys_write, kernel_filesys_close, kernel_filesys_read, kernel_mem_free, kernel_mem_request, bitmap_min, bitmap, update_volatile_capacity, kernel_bitmap_get, kernel_bitmap_update, kernel_mem_cpy);
 
         // Init file system
-        filesys_init(kernel_mem_get, kernel_mem_set, kernel_mem_exists, kernel_mem_request, process_table, kernel_filesys_open, kernel_filesys_access_file, kernel_filesys_close, kernel_filesys_write, kernel_filesys_read, kernel_mem_free, kernel_process_get, kernel_process_update );
+        filesys_init(kernel_mem_get, kernel_mem_set, kernel_mem_exists, kernel_mem_request, process_table, kernel_filesys_open, kernel_filesys_access_file, kernel_filesys_close, kernel_filesys_write, kernel_filesys_read, kernel_mem_free, kernel_process_get, kernel_process_update, kernel_mem_cpy);
 
         // Free volatile memory
         var volatile_memory = JSON.parse(kernel_filesys_read('/.volatile'));
@@ -372,19 +372,18 @@ const VERSION_CODE = 2;
         try {
             // Reads from file and executes code.
             // Reclaim nv memory
-            console.log("P" + process_get_current());
             process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH] = args[1];
-            console.log(process_table[process_get_current()]);
             if (filesys_exists(args[1] + ".data")) {
-                var nvdata = filesys_read(args[1] + ".data").split(",");
-                process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER] = parseInt(nvdata[0]);
-                process_table[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER] = parseInt(nvdata[1]);
+                var nvfile = filesys_read(args[1] + ".data");
+                if (nvfile) {
+                    var nvdata = filesys_read(args[1] + ".data").split(",");
+                    process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER] = parseInt(nvdata[0]);
+                    process_table[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER] = parseInt(nvdata[1]);
+                }
             }
             var fnc = '(function() { ' + filesys_read(args[1]) + '})';
             var script = eval(fnc);
-            console.log(process_table[process_get_current()]);
             script();
-            console.log(process_table[process_get_current()]);
             return "";
         } catch(e) {
             return "Error executing script: " + e;
@@ -409,6 +408,12 @@ const VERSION_CODE = 2;
      */
     // Lowest possible block of memory is 1 byte(s)
     const bitmap_min = 0; // 2 ^ _0_ = 1
+    const kernel_bitmap_get = function() {
+        return bitmap;
+    }
+    const kernel_bitmap_update = function(bmap) {
+        bitmap = bmap;
+    }
     const kernel_mem_exists = function(addr) {
         if (addr < 0 || addr >= config_get_capacity()) {
             throw MEM_ERROR_KERNEL_BOUNDS;
@@ -430,6 +435,18 @@ const VERSION_CODE = 2;
         localStorage['memos_memory_' + addr] = val;
     }
 
+    function save_bitmap() {
+        // b = [[8],[],[],[],[1001],[],[905],[],[521],[9]] <- A pretty okay bitmap revert if necessary.
+        // Save change if possible. This may not be possible IF our bitmap file is being created now.
+        const FILENAME = '/.bitmap';
+        console.info("Saving bitmap", bitmap, kernel_flatten_bitmap(bitmap), JSON.stringify(kernel_flatten_bitmap(bitmap)));
+        if (filesys_exists(FILENAME)) {
+            kernel_filesys_open(FILENAME);
+            kernel_filesys_write(FILENAME, JSON.stringify(kernel_flatten_bitmap(bitmap)));
+            kernel_filesys_close(FILENAME);
+        }
+    }
+
     // This kernel-level function finds available blocks of memory
     //   and provides the starting memory address. Combined with the
     //   number of blocks allocated, this should be able to give
@@ -440,8 +457,7 @@ const VERSION_CODE = 2;
         // Try to over-allocate memory.
         // We need to check the bitmap.
 
-        var requested_bytes = Math.pow(2, Math.ceil(Math.log2(bytes)));
-        var mem_alloc_index = Math.floor(Math.log2(requested_bytes)) - bitmap_min;
+        var mem_alloc_index = Math.floor(Math.log2(bytes)) - bitmap_min;
         for (var i = mem_alloc_index; i < bitmap.length; i++) {
             if (bitmap[i]) {
                 // Allocate memory
@@ -454,13 +470,7 @@ const VERSION_CODE = 2;
                         bitmap[i].prev = null;
                     }
                     update_memory_ui();
-                    // Save change if possible. This may not be possible IF our bitmap file is being created now.
-                    const FILENAME = '/.bitmap';
-                    if (filesys_exists(FILENAME)) {
-                        kernel_filesys_open(FILENAME);
-                        kernel_filesys_write(FILENAME, JSON.stringify(kernel_flatten_bitmap(bitmap)));
-                        kernel_filesys_close(FILENAME);
-                    }
+                    save_bitmap();
 
                     // Return the address in our kernel function. If we're doing something in
                     //   userspace, we should hide the raw address. We can use this address
@@ -486,7 +496,20 @@ const VERSION_CODE = 2;
             }
         }
         // TODO Handle a memory compaction script
+        // TODO Handle a process kill script
+        // TODO Do a full system scan for unused bytes
+        // TODO Find some other ways to free up memory
         throw MEM_ERROR_ALLOCATION;
+    }
+
+    /*
+     * Copies `len` bytes of data from `addr1` to `addr2`. Overwrites.
+     */
+    const kernel_mem_cpy = function(addr1, addr2, len) {
+        for (var i = 0; i < len; i++) {
+            // Do direct kernel memory copying.
+            kernel_mem_set(addr2 + i, kernel_mem_get(addr1 + i));
+        }
     }
 
     const kernel_mem_free = function(addr, len) {
@@ -508,10 +531,7 @@ const VERSION_CODE = 2;
         // TODO Group like memory into larger blocks
         update_memory_ui();
         // Save changes
-        const FILENAME = '/.bitmap';
-        kernel_filesys_open(FILENAME);
-        kernel_filesys_write(FILENAME, JSON.stringify(kernel_flatten_bitmap(bitmap)));
-        kernel_filesys_close(FILENAME);
+        save_bitmap();
         return MEM_FREE_OK;
     }
 

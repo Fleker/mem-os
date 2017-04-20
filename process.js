@@ -130,7 +130,7 @@ const PTABLE_COLUMN_PROCESS_ARGS = "args";
             return;
         }
         // Automatic memory cleanup
-        mem_free(kernel_process_get()[pid][PTABLE_COLUMN_BASE_REGISTER], kernel_process_get()[pid][PTABLE_COLUMN_LIMIT_REGISTER]);
+        mem_free(0, kernel_process_get()[pid][PTABLE_COLUMN_LIMIT_REGISTER]);
         // By removing it from the process table we will not call it anymore
         var pt = kernel_process_get();
         delete pt[pid];
