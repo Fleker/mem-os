@@ -371,7 +371,15 @@ const VERSION_CODE = 2;
     const cmd_exec = function(args) {
         try {
             // Reads from file and executes code.
+            // Reclaim nv memory
+            process_table[process_get_current()][PTABLE_COLUMN_APPLICATION_PATH] = args[1];
+            if (filesys_exists(args[1] + ".data")) {
+                var nvdata = filesys_read(args[1] + ".data").split(",");
+                process_table[process_get_current()][PTABLE_COLUMN_BASE_NVREGISTER] = parseInt(nvdata[0]);
+                process_table[process_get_current()][PTABLE_COLUMN_LIMIT_NVREGISTER] = parseInt(nvdata[1]);
+            }
             eval(filesys_read(args[1]));
+            return "";
         } catch(e) {
             return "Error executing script: " + e;
         }
@@ -490,7 +498,7 @@ const VERSION_CODE = 2;
     function kernel_flatten_bitmap(bitmap) {
         // Turn bitmap into a standard matrix
         var bmtx = [];
-        for (i in bitmap) {
+        for (var i = 0; i < bitmap.length; i++) {
             var n = bitmap[i];
             if (n) {
                 bmtx[i] = [n.value];

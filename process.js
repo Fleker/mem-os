@@ -74,6 +74,12 @@ const PTABLE_COLUMN_PROCESS_ARGS = "args";
         if (params) {
             p[PTABLE_COLUMN_PROCESS_ARGS] = params;
         }
+        // Move over path if that was defined in current process
+        if (process_table[current_process] && process_table[current_process][PTABLE_COLUMN_APPLICATION_PATH]) {
+            p[PTABLE_COLUMN_APPLICATION_PATH] = process_table[current_process][PTABLE_COLUMN_APPLICATION_PATH];
+            p[PTABLE_COLUMN_BASE_NVREGISTER] = process_table[current_process][PTABLE_COLUMN_BASE_NVREGISTER];
+            p[PTABLE_COLUMN_LIMIT_NVREGISTER] = process_table[current_process][PTABLE_COLUMN_LIMIT_NVREGISTER];
+        }
         process_table[p[PTABLE_COLUMN_PID]] = p;
 
         update_ui();
@@ -113,6 +119,9 @@ const PTABLE_COLUMN_PROCESS_ARGS = "args";
     process_remove = function(pid) {
         if (pid == 0) {
             // Cannot end system task
+            return;
+        }
+        if (!process_table[pid]) {
             return;
         }
         // Automatic memory cleanup

@@ -140,7 +140,24 @@ const FILESYS_OP_OK = 0;
                 // Pass in the offset which is from the file system.
                 // If the capacity is now lower, some data will be cut-off. Some things may not work as expected.
                 kernel_filesys_open(FILE_BITMAP);
-                kernel_filesys_write(FILE_BITMAP, JSON.stringify(bitmap));
+                function kernel_flatten_bitmap(bitmap) {
+                    // Turn bitmap into a standard matrix
+                    var bmtx = [];
+                    for (var i = 0; i < bitmap.length; i++) {
+                        var n = bitmap[i];
+                        if (n) {
+                            bmtx[i] = [n.value];
+                            while (n.next) {
+                                n = n.next;
+                                bmtx[i].push(n.value);
+                            }
+                        } else {
+                            bmtx[i] = [];
+                        }
+                    }
+                    return bmtx;
+                }
+                kernel_filesys_write(FILE_BITMAP, JSON.stringify(kernel_flatten_bitmap(bitmap)));
                 kernel_filesys_close(FILE_BITMAP);
             } else {
                 // Inflate bitmap
@@ -165,7 +182,7 @@ const FILESYS_OP_OK = 0;
                 // Create
                 filesys_create(FILE_VOLATILE_MEMORY, 777);
                 kernel_filesys_open(FILE_VOLATILE_MEMORY);
-                kernel_filesys_write(FILE_VOLATILE_MEMORY, JSON.stringify([]));
+                kernel_filesys_write(FILE_VOLATILE_MEMORY, JSON.stringify({}));
                 kernel_filesys_close(FILE_VOLATILE_MEMORY);
             }
 

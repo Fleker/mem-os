@@ -59,6 +59,8 @@ Aside from the non-volatility, the functions and their behaviors are identical.
 * `nvmem_set_parent(addr, data)`
 
 ### Processes
+Processes can be created, and the terminal itself creates a process on every command. When a process is created from the terminal, the file path is copied onto the process table and then can be used for file management. Processes do not persist reboot in this version.
+
 * `process_create(name, process_function, [args])`
 * `process_create_child(name, process_function, [args])`
 * `process_remove(pid)`
