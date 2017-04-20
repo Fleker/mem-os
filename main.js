@@ -286,7 +286,12 @@ const VERSION_CODE = 2;
             return "All data was deleted /shrug";
         }
         try {
-            filesys_delete_file(args[1]);
+            if (args[2] == "-r") {
+                // Delete directory
+                filesys_delete_dir(args[1]);
+            } else {
+                filesys_delete_file(args[1]);
+            }
             return args[1] + " was removed";
         } catch(e) {
             return "Error " + e;
@@ -295,9 +300,69 @@ const VERSION_CODE = 2;
 
     const cmd_edit = function(args) {
         try {
-            var vector = kernel_filesys_access_file(args[1]);
+            // First lock the file so it doesn't change.
+            if (!filesys_exists(args[1])) {
+                // Create file first
+                filesys_create(args[1]);
+            }
+            kernel_filesys_open(args[1]);
+            var value = kernel_filesys_read(args[1]);
+            $('#overlay').style.display = 'block';
+            $('#history').style.display = 'none';
+            $('#overlay').innerHTML = "<textarea id='editarea' class='terminal'>" + value + "</textarea><br>^X: Save n Quit";
+            $('#editarea').focus();
+            $('#editarea').onkeyup = function(event) {
+                var code = event.keyCode;
+                if (code == 88 && event.ctrlKey) {
+                    // Save file
+                    console.log($('#editarea').innerHTML);
+                    kernel_filesys_write(args[1], $('#editarea').value);
+                    kernel_filesys_close(args[1]);
+                    $('#overlay').style.display = 'none';
+                    $('#overlay').innerHTML = '';
+                    $('#history').style.display = 'block';
+                    $('#entry').focus();
+
+                    cli_history_append('File saved to disk.');
+                }
+            }
+            return "Opening Femto Editor";
         } catch(e) {
             return "Error " + e;
+        }
+    }
+
+    const cmd_touch = function(args) {
+        try {
+            if (filesys_exists(args[1])) {
+                return "File exists";
+            } else {
+                filesys_create(args[1], 777);
+                return "Created " + args[1];
+            }
+        } catch(e) {
+            return "Error " + e;
+        }
+    }
+
+    const cmd_mkdir = function(args) {
+        try {
+            if (filesys_exists(args[1])) {
+                return "Directory or file already exists";
+            }
+            filesys_create_dir(args[1]);
+            return "Directory " + args[1] + " created";
+        } catch(e) {
+            return "Error " + e;
+        }
+    }
+
+    const cmd_exec = function(args) {
+        try {
+            // Reads from file and executes code.
+            exec(filesys_read(args[1]));
+        } catch(e) {
+            return "Error executing script: " + e;
         }
     }
 
@@ -462,7 +527,7 @@ const VERSION_CODE = 2;
         return [directory, directoryAddr, fn];
     }
 
-        // Traverses file structure and returns vector of relevant data
+    // Traverses file structure and returns vector of relevant data
     const kernel_filesys_access_dir = function(filename, dothrow) {
         if (typeof dothrow == "undefined") {
             // Default to throwing errors
@@ -603,6 +668,9 @@ const VERSION_CODE = 2;
     cli_register("ls", cmd_ls);
     cli_register("rm", cmd_rm);
     cli_register("edit", cmd_edit);
+    cli_register("touch", cmd_touch);
+    cli_register("mkdir", cmd_mkdir);
+    cli_register("exec", cmd_exec);
 
     boot_state("Remembering...");
 

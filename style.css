@@ -1,10 +1,15 @@
-body {
+body, .terminal {
     background-color: black;
     font-family: monospace;
     color: #efefef;
     margin: 0px;
     padding: 0px;
     overflow-y: hidden;
+}
+
+.terminal {
+    width: 90vw;
+    height: calc(100% - 96px);
 }
 
 #history {
