@@ -201,7 +201,7 @@ const VERSION_CODE = 3;
             return "Rebooting...";
         } else if (args[1] == "-s") {
             // Can't close window itself, redirect to help
-            window.location.href = "README.md";
+            window.location.href = "http://github.com/fleker/MemOS";
             return;
         } else {
             return "-r : Reboot<br>-s : Shutdown";
