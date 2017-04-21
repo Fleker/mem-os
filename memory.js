@@ -66,7 +66,6 @@ const MEM_FREE_OK = 0;
             kernel_bitmap_get = kbg;
             kernel_bitmap_update = kbu;
             kernel_mem_cpy = kmc;
-//            bitmap_min = bm;
             update_capacity = uvc;
 
             is_mem_init = true;
@@ -112,9 +111,9 @@ const MEM_FREE_OK = 0;
             var bitmap = [];
             var start = Math.log2(length); // We start from here.
             var mem_remaining = length;
-            while (mem_remaining > bitmap_min) {
+            while (mem_remaining > 0) {
                 // Get index
-                var mem_alloc_index = Math.floor(Math.log2(length)) - bitmap_min;
+                var mem_alloc_index = Math.floor(Math.log2(length)) - 0;
                 var mem_alloc = Math.pow(2, Math.floor(Math.log2(length)));
                 var mem_addr = mem_remaining - mem_alloc + offset; // Get the address for this block.
                 bitmap[mem_alloc_index] = new Node(mem_addr);

@@ -1,7 +1,9 @@
 # MemOS
 _An operating system emulator using solely resistive-based memory_
 
-[Try it Out](index.html)
+<img src='https://raw.githubusercontent.com/Fleker/MemOS/master/memgiraffe.png?token=ADI588JacQ4sLEpDyzvL64VCd2zLDJNXks5ZApvUwA%3D%3D' width='200px' />
+
+[Try it Out](http://nickfelker.me/MemOS/)
 
 ## What does it do?
 * Process table
@@ -20,6 +22,18 @@ _An operating system emulator using solely resistive-based memory_
     
 ## What is that thing?
 This is the mascot of MemOS, MemGiraffre.
+
+## Using MemOS
+
+### Terminal
+The terminal is the core aspect of the user-facing system, much like many operating systems. You can type `help` to see what's possible. Processes may register their own commands. Some other commands are below.
+
+* `touch` - If the file doesn't exist, creates file.
+* `edit` - Edits file.
+* `exec` - Executes file as if it was a script.
+
+### Additional Tabs
+As this project is experimental and for research, other tabs show helpful debug information, such as the bitmap used by the system, or a list of every memory block and its allocation. The _Resource Monitor_ tab shows global read/write times as well as energy used.
 
 ## Developing for MemOS
 
