@@ -45,9 +45,9 @@ function update_resource_monitor(thing) {
     $('#tab_5').innerHTML += "&emsp;System Uptime: " + upStr;
     $('#tab_5').innerHTML += "<br><br><br>Energy Usage: " + resource_monitor_energy + "pJ";
     $('#tab_5').innerHTML += "<br><br><br>Time Spent: <br>";
-    $('#tab_5').innerHTML += "&emsp;Read Time: " + resource_monitor_read + "ns<br>&emsp;Write Time: " + resource_monitor_write + "ns";
+    $('#tab_5').innerHTML += "&emsp;Read Time: " + resource_monitor_read + "ns<br>&emsp;Write Time: " + resource_monitor_write + "ns<br>&emsp;" + resource_monitor_read + " reads and " + resource_monitor_write + " writes";
     $('#tab_5').innerHTML += "<br><br><br>System Config:<br>";
-    $('#tab_5').innerHTML += "&emsp;Physical Size: " + physical_size + "F<sup>2</sup><br>&emsp;Processor: " + config_get_clock() + " GHz<br>&emsp;Capacity: " + config_get_capacity() + " Bytes";
+    $('#tab_5').innerHTML += "&emsp;Physical Size: " + physical_size + "F<sup>2</sup><br>&emsp;Capacity: " + config_get_capacity() + " Bytes";
 }
 
 // Gets the hardware read duration in nanoseconds.
@@ -460,11 +460,12 @@ const VERSION_CODE = 3;
         if (addr < 0 || addr >= config_get_capacity()) {
             throw MEM_ERROR_KERNEL_BOUNDS;
         }
+        if (config_get_read_ns()) {
+            delay(config_get_read_ns() / 10e9);
+            resource_monitor_cnt_read++;
+        }
         update_resource_monitor('read');
         update_resource_monitor('energy');
-        if (config_get_read_ns()) { // FIXME Is this the write amount of time?
-            delay(config_get_read_ns() / config_get_clock());
-        }
         return localStorage['memos_memory_' + addr];
     }
 
@@ -472,12 +473,12 @@ const VERSION_CODE = 3;
         if (addr < 0 || addr >= config_get_capacity()) {
             throw MEM_ERROR_KERNEL_BOUNDS;
         }
+        if (config_get_write_ns()) {
+            delay(config_get_write_ns() / 10e9);
+            resource_monitor_cnt_write++;
+        }
         update_resource_monitor('write');
         update_resource_monitor('energy');
-        if (config_get_write_ns()) {
-            // FIXME Is this the write amount of time?
-            delay(config_get_write_ns() / config_get_clock());
-        }
         localStorage['memos_memory_' + addr] = val;
     }
 
