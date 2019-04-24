@@ -3,7 +3,7 @@ _An operating system emulator using solely resistive-based memory_
 
 <img src='https://raw.githubusercontent.com/Fleker/MemOS/master/memgiraffe.png?token=ADI588JacQ4sLEpDyzvL64VCd2zLDJNXks5ZApvUwA%3D%3D' width='200px' />
 
-[Try it Out](http://nickfelker.me/MemOS/)
+[Try it Out](http://felker.dev/MemOS/)
 
 ## What does it do?
 * Process table
