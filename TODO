@@ -1,0 +1,11 @@
+cli_register("shutdown", cmd_shutdown);
+cli_register("processes", cmd_process);
+cli_register("memtest", cmd_mem_test);
+cli_register("kill", cmd_kill);
+cli_register("read", cmd_read);
+cli_register("ls", cmd_ls);
+cli_register("rm", cmd_rm);
+cli_register("edit", cmd_edit);
+cli_register("touch", cmd_touch);
+cli_register("mkdir", cmd_mkdir);
+cli_register("exec", cmd_exec);

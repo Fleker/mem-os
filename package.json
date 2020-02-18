@@ -1,0 +1,25 @@
+{
+    "name": "mem-os",
+    "private": true,
+    "author": "Nick Felker",
+    "license": "Apache-2.0",
+    "main": "dist/cli.js",
+    "dependencies": {
+        "@polymer/polymer": "^3.1.0",
+        "@types/form-data": "^2.5.0"
+    },
+    "devDependencies": {
+        "ava": "^2.4.0",
+        "nyc": "^14.1.1",
+        "parcel-bundler": "^1.12.4",
+        "polymer-cli": "^1.8.1",
+        "typescript": "^3.7.3"
+    },
+    "scripts": {
+        "build": "tsc",
+        "host": "polymer serve",
+        "serve": "polymer serve",
+        "start": "polymer serve",
+        "test": "yarn build && nyc ava --fail-fast"
+    }
+}

@@ -1,9 +1,12 @@
-# MemOS
-_An operating system emulator using solely resistive-based memory_
+# Mem OS
+A computer architecture designed using non-volatile memory to serve as a single unit
+for system main memory and storage. This proposed design should result in lower power
+consumption, faster processing, and instant boot.
 
-<img src='https://raw.githubusercontent.com/Fleker/MemOS/master/memgiraffe.png?token=ADI588JacQ4sLEpDyzvL64VCd2zLDJNXks5ZApvUwA%3D%3D' width='200px' />
+This repository contains a web-based simulator of such an architecture, designed in
+such a way to provide access to simulated experiments and experimental data.
 
-[Try it Out](http://felker.dev/memos/)
+[Try it Out](http://felker.dev/mem-os/)
 
 ## What does it do?
 * Process table
@@ -19,9 +22,6 @@ _An operating system emulator using solely resistive-based memory_
     * Lower-level than I plan on implementing.
 * Separate memory / storage systems
     * As this is simulating a system with a joint memory/storage, this isn't something I plan on implementing.
-    
-## What is that thing?
-This is the mascot of MemOS, MemGiraffre.
 
 ## Using MemOS
 
@@ -122,5 +122,3 @@ The dream journal is a global ledger for processes to resume actions that did no
 ### Known Issues
 * Memory / storage isn't actually that secure due to `localStorage` limitations.
 * One memory cell can technically store a virtually unlimited amount of data.
-
-# Changelog

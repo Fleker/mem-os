@@ -7,56 +7,6 @@ body, .terminal {
     overflow-y: hidden;
 }
 
-.terminal {
-    width: 90vw;
-    height: calc(100% - 96px);
-}
-
-#history {
-    height: calc(100% - 48px);
-    padding-left: 8px;
-    overflow-y: scroll;
-}
-
-.highlight-green {
-    background-color: #1B5E20;
-}
-
-#entry::before {
-    content: ">"
-}
-
-#entry {
-    height: 20px;
-    background-color: black;
-    color: #efefef;
-    border: none;
-    padding-left: 8px;
-    width: calc(100% - 80px);
-    border-top: solid 1px rgba(255, 255, 255, 0.1);
-    padding-top: 2px;
-    padding-bottom: 2px;
-    font-family: monospace;
-}
-
-#entry:focus {
-    border: solid 1px #999;
-}
-
-/* Fancy Scrollbar */
-#history::-webkit-scrollbar, #tab_3::-webkit-scrollbar {
-    width: 1em;
-}
-
-#history::-webkit-scrollbar-track, #tab_3::-webkit-scrollbar-track {
-    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
-}
-
-#history::-webkit-scrollbar-thumb, #tab_3::-webkit-scrollbar-thumb {
-  background-color: darkgrey;
-  outline: 1px solid slategrey;
-}
-
 #splashscreen {
     position: fixed;
     background-color: #772953;
@@ -65,17 +15,18 @@ body, .terminal {
     font-family: sans-serif;
     text-align: center;
     padding-top: 10%;
+    transition: 1s all;
 }
 
 /* TABS / UI */
-.tab_label {
+.tab-label {
     text-transform: uppercase;
     border-right: solid 1px #555;
     padding-right: 4px;
     padding-left: 4px;
 }
 
-.tab_label.active {
+.tab-label.active {
     font-weight: bold;
     background-color: #555;
 }

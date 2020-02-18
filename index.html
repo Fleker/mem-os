@@ -1,19 +1,24 @@
 <html>
     <head>
-        <title>MemOS - Memristive Memory Emulator</title>
+        <title>MemOS - Resistive RAM OS Simulator</title>
         <link href="style.css" rel="stylesheet" />
-        <!-- TODO FAVICON -->
         <link href="loading.css" rel="stylesheet" />
+        <script type="module" src="dist/components/command-terminal.js"></script>
+        <script type="module" src="dist/components/process-table.js"></script>
+        <script type="module" src="dist/components/bitmap-table.js"></script>
+        <script type="module" src="dist/components/memory-allocation.js"></script>
+        <script type="module" src="dist/components/memory-map.js"></script>
+        <script type="module" src="dist/components/resource-monitor.js"></script>
     </head>
     <body>
         <table>
             <tr>
-                <td class='tab_label active' id='tab_label_0' onclick='show_tab(0)'>Terminal</td>
-                <td class='tab_label' id='tab_label_1' onclick='show_tab(1)'>Processes</td>
-                <td class='tab_label' id='tab_label_2' onclick='show_tab(2)'>Bitmap</td>
-                <td class='tab_label' id='tab_label_3' onclick='show_tab(3)'>Memory Table</td>
-                <td class='tab_label' id='tab_label_4' onclick="show_tab(4)">Memory Map</td>
-                <td class='tab_label' id='tab_label_5' onclick="show_tab(5)">Resource Monitor</td>
+                <td class='tab-label' onclick='show_tab(0)'>Terminal</td>
+                <td class='tab-label' onclick='show_tab(1)'>Processes</td>
+                <td class='tab-label' onclick='show_tab(2)'>Bitmap</td>
+                <td class='tab-label' onclick='show_tab(3)' style='display:none'>Memory Allocation</td>
+                <td class='tab-label' onclick="show_tab(4)">Memory Map</td>
+                <td class='tab-label' onclick="show_tab(5)">Resource Monitor</td>
             </tr>
         </table>
         <div id='splashscreen'>
@@ -27,28 +32,66 @@
             </div>
             <h2 id='boot_status'>Loading...</h2>
         </div>
-        <div class='tab' id='tab_0'>
-            <div id='overlay'></div>
-            <div id='terminal'>
-                <div id='history'></div>
-                <form id='cli' onsubmit="cli_handler(); return false;">
-                    <span>&emsp; &raquo; &nbsp;</span>
-                    <input id='entry' focused autocomplete="off" />
-                </form>
-            </div>
-        </div>
-        <div class='tab' id='tab_1'></div>
-        <div class='tab' id='tab_2'></div>
-        <div class='tab' id='tab_3'></div>
-        <div class='tab' id='tab_4' style="display:none;">
-            <canvas id='memory_map' width='160'></canvas>
-        </div>
-        <div class='tab' id='tab_5'></div>
-        <script src="cli.js"></script>
-        <script src="process.js"></script>
-        <script src="memory.js"></script>
-        <script src="filesys.js"></script>
-        <script src="journal.js"></script>
-        <script src='main.js' defer></script>
+        <command-terminal class='tab'></command-terminal>
+        <process-table class='tab'></process-table>
+        <bitmap-table class='tab'></bitmap-table>
+        <memory-allocation class='tab'></memory-allocation>
+        <memory-map class='tab'></memory-map>
+        <resource-monitor class='tab'></resource-monitor>
+
+        <script>
+            function show_tab(tabId) {
+                const tips = document.querySelectorAll('.tab-label')
+                const tabs = document.querySelectorAll('.tab')
+                tips.forEach(tip => tip.classList.remove('active'))
+                tabs.forEach(tab => tab.style.display = 'none')
+                tips[tabId].classList.add('active')
+                tabs[tabId].style.display = 'block'
+                tabs[tabId].activeCallback()
+            }
+
+            window.onload = () => {
+                const splash = document.querySelector('#splashscreen')
+                setTimeout(() => {
+                    splash.style.opacity = 0
+                }, 0)
+                setTimeout(() => {
+                    splash.style.display = 'none'
+                }, 0)
+                show_tab(0)
+            }
+        </script>
+
+        <script>
+            // Setup Polymer options
+            window.Polymer = {
+                dom: 'shadow',
+                lazyRegister: true
+            };
+        </script>
+
+        <script type="module">
+            import FileSystem from "./dist/file-system";
+            import BitmapMemory from "./dist/bitmap-memory";
+            import NvmMemoryManager from "./dist/nvm-memory";
+            import ResourceMonitor from "./dist/resource-monitor";
+            import ProcessTable from "./dist/process-table";
+            import System from './dist/system'
+            // Boot server
+            const monitor = new ResourceMonitor()
+            const memory = new BitmapMemory({minBytes: 2, physicalSize: 512})
+            const files = new FileSystem({
+                memory,
+                inodeSize: 4
+            })
+            const nvmMemory = new NvmMemoryManager({memory})
+            const process = new ProcessTable({memory, files})
+
+            const system = new System({monitor, memory, files, nvmMemory, process})
+
+            // Attach our system throughout our components
+            const tabs = document.querySelectorAll('.tab')
+            tabs.forEach(tab => tab.system = system)
+        </script>
     </body>
 </html>
