@@ -71,12 +71,12 @@
         </script>
 
         <script type="module">
-            import FileSystem from "./dist/file-system";
-            import BitmapMemory from "./dist/bitmap-memory";
-            import NvmMemoryManager from "./dist/nvm-memory";
-            import ResourceMonitor from "./dist/resource-monitor";
-            import ProcessTable from "./dist/process-table";
-            import System from './dist/system'
+            import FileSystem from "./dist/file-system.js";
+            import BitmapMemory from "./dist/bitmap-memory.js";
+            import NvmMemoryManager from "./dist/nvm-memory.js";
+            import ResourceMonitor from "./dist/resource-monitor.js";
+            import ProcessTable from "./dist/process-table.js";
+            import System from './dist/system.js'
             // Boot server
             const monitor = new ResourceMonitor()
             const memory = new BitmapMemory({minBytes: 2, physicalSize: 512})
